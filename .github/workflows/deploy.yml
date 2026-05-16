@@ -1,0 +1,177 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "kereo-backend/**"
+      - "kereo-frontend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      deploy_backend:
+        description: "Deploy backend service"
+        required: false
+        default: true
+        type: boolean
+      deploy_frontend:
+        description: "Deploy frontend service"
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: kereo-v2-apps
+  ECS_CLUSTER: kereo-v2-cluster
+  BACKEND_SERVICE: kereo-v2-api-service
+  BACKEND_TASK_FAMILY: kereo-v2-api
+  BACKEND_CONTAINER_NAME: kereo-v2-api
+  FRONTEND_SERVICE: kereo-v2-frontend-service
+  FRONTEND_TASK_FAMILY: kereo-v2-frontend
+  FRONTEND_CONTAINER_NAME: kereo-v2-frontend
+  FRONTEND_API_URL: https://kereo.online/api
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'kereo-backend/**'
+            frontend:
+              - 'kereo-frontend/**'
+
+  deploy-backend:
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' && inputs.deploy_backend ||
+      github.event_name == 'push' && needs.detect-changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set backend image URI
+        id: backend-image
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:backend-${SHORT_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./kereo-backend
+          push: true
+          tags: ${{ steps.backend-image.outputs.image_uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Download current backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${BACKEND_TASK_FAMILY}" \
+            --query taskDefinition \
+            > backend-task-definition.json
+
+      - name: Render backend task definition
+        id: render-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-definition.json
+          container-name: ${{ env.BACKEND_CONTAINER_NAME }}
+          image: ${{ steps.backend-image.outputs.image_uri }}
+
+      - name: Deploy backend task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-backend.outputs.task-definition }}
+          service: ${{ env.BACKEND_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  deploy-frontend:
+    needs: detect-changes
+    if: >
+      github.event_name == 'workflow_dispatch' && inputs.deploy_frontend ||
+      github.event_name == 'push' && needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set frontend image URI
+        id: frontend-image
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          IMAGE_URI="${{ steps.login-ecr.outputs.registry }}/${ECR_REPOSITORY}:frontend-${SHORT_SHA}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./kereo-frontend
+          push: true
+          tags: ${{ steps.frontend-image.outputs.image_uri }}
+          build-args: |
+            VITE_API_URL=${{ env.FRONTEND_API_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Download current frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${FRONTEND_TASK_FAMILY}" \
+            --query taskDefinition \
+            > frontend-task-definition.json
+
+      - name: Render frontend task definition
+        id: render-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-definition.json
+          container-name: ${{ env.FRONTEND_CONTAINER_NAME }}
+          image: ${{ steps.frontend-image.outputs.image_uri }}
+
+      - name: Deploy frontend task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render-frontend.outputs.task-definition }}
+          service: ${{ env.FRONTEND_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

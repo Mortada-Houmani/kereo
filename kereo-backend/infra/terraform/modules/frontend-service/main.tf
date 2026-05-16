@@ -85,6 +85,7 @@ resource "aws_ecs_service" "this" {
 
   lifecycle {
     ignore_changes = [
+      task_definition,
       desired_count,
       health_check_grace_period_seconds,
       deployment_controller,
