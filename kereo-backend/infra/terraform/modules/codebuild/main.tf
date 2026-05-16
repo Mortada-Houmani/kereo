@@ -96,7 +96,7 @@ resource "aws_codebuild_project" "this" {
             - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
         build:
           commands:
-            - docker build -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" -f "$DOCKERFILE_PATH" .
+            - docker build -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" --build-arg "APP_BASE_PATH=$APP_BASE_PATH" -f "$DOCKERFILE_PATH" .
         post_build:
           commands:
             - docker push "$IMAGE_URI"

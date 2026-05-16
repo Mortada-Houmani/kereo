@@ -220,6 +220,12 @@ export function ProjectDetailPage() {
             <span className="detail-tile-label"><HeartPulse size={11} /> Health check</span>
             <span className="detail-tile-value mono">{project.healthCheckPath}</span>
           </div>
+          {project.runtimeType === 'static-site' && project.slug && (
+            <div className="detail-info-tile">
+              <span className="detail-tile-label"><Globe size={11} /> Build base path</span>
+              <span className="detail-tile-value mono">{`/apps/${project.slug}/`}</span>
+            </div>
+          )}
           {latestDep?.databaseName && (
             <div className="detail-info-tile">
               <span className="detail-tile-label"><Database size={11} /> Database</span>

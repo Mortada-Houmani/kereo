@@ -119,6 +119,18 @@ resource "aws_iam_role_policy" "app_runtime" {
       {
         Effect = "Allow"
         Action = [
+          "ec2:AuthorizeSecurityGroupIngress",
+          "ec2:CreateSecurityGroup",
+          "ec2:CreateTags",
+          "ec2:DeleteSecurityGroup",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeVpcs"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
           "ecs:CreateService",
           "ecs:DeleteService",
           "ecs:DeregisterTaskDefinition",

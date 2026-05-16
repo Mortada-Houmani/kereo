@@ -28,6 +28,31 @@ This is infrastructure-level support only. Kereo will provision the right target
 
 For example, Vite/React SPAs may need their framework `base` value set explicitly for subpath hosting.
 
+For `static-site` projects, Kereo provides this Docker build arg automatically during deployment:
+
+```text
+APP_BASE_PATH=/apps/<slug>/
+```
+
+A Vite app can consume it like this:
+
+```ts
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: process.env.APP_BASE_PATH || '/',
+})
+```
+
+and a Dockerfile can pass it into the build stage like this:
+
+```dockerfile
+ARG APP_BASE_PATH=/
+ENV APP_BASE_PATH=$APP_BASE_PATH
+```
+
 ## Production URLs
 
 - Frontend: `https://kereo.online/`
