@@ -1,0 +1,224 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+/* ── Tokens ─────────────────────────────────────────────────────────────────── */
+:root {
+  --bg-base:        #0d0d0f;
+  --bg-surface:     #131316;
+  --bg-elevated:    #1a1a1f;
+  --bg-hover:       #1f1f26;
+  --border:         #252530;
+  --border-bright:  #32324a;
+
+  --text-primary:   #f0f0f5;
+  --text-secondary: #9090a8;
+  --text-muted:     #55556a;
+
+  --accent:         #b5ff4d;
+  --accent-dim:     rgba(181,255,77,.12);
+  --accent-hover:   #c8ff6e;
+
+  --red:    #ff5050;
+  --red-dim: rgba(255,80,80,.12);
+  --yellow: #f5c842;
+  --yellow-dim: rgba(245,200,66,.12);
+  --blue:   #5599ff;
+  --blue-dim: rgba(85,153,255,.12);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,.12);
+  --teal:   #34d399;
+  --teal-dim: rgba(52,211,153,.12);
+
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 16px;
+
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'Space Mono', 'Fira Code', monospace;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow:    0 4px 16px rgba(0,0,0,.5);
+  --shadow-lg: 0 8px 40px rgba(0,0,0,.6);
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100dvh;
+  line-height: 1.5;
+}
+
+a { color: inherit; text-decoration: none; }
+
+button { font-family: var(--font-sans); cursor: pointer; border: none; background: none; }
+
+input, textarea, select {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+input::placeholder, textarea::placeholder { color: var(--text-muted); }
+
+code, pre { font-family: var(--font-mono); }
+
+/* ── Scrollbar ───────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
+
+/* ── Layout helpers ─────────────────────────────────────────────────────────── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius-sm);
+  font-size: .875rem; font-weight: 600;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent); color: #0d0d0f;
+}
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(181,255,77,.25); }
+.btn-ghost {
+  background: transparent; color: var(--text-secondary); border: 1px solid var(--border);
+}
+.btn-ghost:hover { border-color: var(--border-bright); color: var(--text-primary); background: var(--bg-hover); }
+.btn-danger {
+  background: var(--red-dim); color: var(--red); border: 1px solid transparent;
+}
+.btn-danger:hover { background: rgba(255,80,80,.2); border-color: var(--red); }
+.btn-sm { padding: 6px 12px; font-size: .8rem; }
+.btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
+
+/* ── Card ────────────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+.card-hover {
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+}
+.card-hover:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+/* ── Status badges ───────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 99px;
+  font-size: .72rem; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+}
+.badge-success  { background: var(--teal-dim);   color: var(--teal);   }
+.badge-failed   { background: var(--red-dim);    color: var(--red);    }
+.badge-building { background: var(--yellow-dim); color: var(--yellow); }
+.badge-queued   { background: var(--purple-dim); color: var(--purple); }
+.badge-deploying{ background: var(--blue-dim);   color: var(--blue);   }
+.badge-neutral  { background: var(--bg-elevated);color: var(--text-secondary); border: 1px solid var(--border); }
+
+/* ── Mono text ───────────────────────────────────────────────────────────────── */
+.mono { font-family: var(--font-mono); font-size: .78rem; color: var(--text-secondary); }
+
+/* ── Divider ─────────────────────────────────────────────────────────────────── */
+.divider { height: 1px; background: var(--border); margin: 0; }
+
+/* ── Spinner ─────────────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border-bright);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── Pulse dot ───────────────────────────────────────────────────────────────── */
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.pulse-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+/* ── Log block ───────────────────────────────────────────────────────────────── */
+.log-block {
+  background: #0a0a0c;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  line-height: 1.7;
+  color: #a0a0b8;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 64px 24px; text-align: center; color: var(--text-muted);
+}
+.empty-state svg { opacity: .3; }
+.empty-state h3 { font-size: 1rem; font-weight: 600; color: var(--text-secondary); }
+
+/* ── Form label ──────────────────────────────────────────────────────────────── */
+.label { display: block; font-size: .82rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 6px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-error { font-size: .78rem; color: var(--red); margin-top: 4px; }
+
+/* ── Animations ──────────────────────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fadeIn .25s ease both; }
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--bg-hover) 50%, var(--bg-elevated) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────────────── */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item {
+  display: grid; grid-template-columns: 20px 1fr;
+  gap: 0 14px; position: relative;
+}
+.timeline-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  margin-top: 5px; flex-shrink: 0; position: relative; left: 5px;
+}
+.timeline-line {
+  position: absolute; left: 9px; top: 16px; bottom: -8px;
+  width: 2px; background: var(--border);
+}
+.timeline-content { padding-bottom: 20px; }

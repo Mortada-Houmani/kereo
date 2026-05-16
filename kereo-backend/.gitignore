@@ -1,0 +1,84 @@
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+
+# logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env
+.env
+.env.*
+!.env.example
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# terraform variable files
+*.auto.tfvars
+terraform.tfvars
+
+# docker
+docker-data/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# uploads
+uploads/
+
+# temp
+tmp/
+temp/
+
+# coverage
+coverage/
+
+# NestJS
+dist/
+
+# React
+.next/
+out/
+
+# misc
+*.pem
+*.key
+
+# deployment artifacts
+/deployments/
+
+# local database
+*.sqlite
+
+# archive
+*.zip
+*.tar.gz
+node_modules/
+dist/
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+.env
+.env.*
+!.env.example
+/deployments/
