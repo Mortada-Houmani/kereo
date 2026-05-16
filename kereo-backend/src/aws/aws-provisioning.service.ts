@@ -215,12 +215,8 @@ export class AwsProvisioningService implements OnModuleInit {
                 UrlRewriteConfig: {
                   Rewrites: [
                     {
-                      Regex: `^/apps/${escapedSlug}$`,
-                      Replace: '/',
-                    },
-                    {
-                      Regex: `^/apps/${escapedSlug}(/.*)$`,
-                      Replace: '$1',
+                      Regex: `^/apps/${escapedSlug}/?(.*)$`,
+                      Replace: '/$1',
                     },
                   ],
                 },
