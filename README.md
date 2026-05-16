@@ -20,38 +20,13 @@ Kereo supports two Dockerized project runtime presets:
   - default port: `80`
   - default health check path: `/`
 
-This is infrastructure-level support only. Kereo will provision the right target-group defaults, but static SPA frameworks may still need their own base-path configuration when hosted under:
+Projects are published on dedicated subdomains:
 
 ```text
-/apps/<slug>
+<slug>.kereo.online
 ```
 
-For example, Vite/React SPAs may need their framework `base` value set explicitly for subpath hosting.
-
-For `static-site` projects, Kereo provides this Docker build arg automatically during deployment:
-
-```text
-APP_BASE_PATH=/apps/<slug>/
-```
-
-A Vite app can consume it like this:
-
-```ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-  base: process.env.APP_BASE_PATH || '/',
-})
-```
-
-and a Dockerfile can pass it into the build stage like this:
-
-```dockerfile
-ARG APP_BASE_PATH=/
-ENV APP_BASE_PATH=$APP_BASE_PATH
-```
+That means static React and Vite apps can usually keep their normal root-relative asset setup instead of being rewritten for a subpath like `/apps/<slug>`.
 
 ## Production URLs
 

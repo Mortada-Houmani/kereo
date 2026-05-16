@@ -174,3 +174,18 @@ resource "aws_route53_record" "app" {
     evaluate_target_health = true
   }
 }
+
+resource "aws_route53_record" "wildcard_app" {
+  count = var.hosted_zone_id == null || var.domain_name == null ? 0 : 1
+
+  zone_id         = var.hosted_zone_id
+  name            = "*.${var.domain_name}"
+  type            = "A"
+  allow_overwrite = true
+
+  alias {
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
+    evaluate_target_health = true
+  }
+}

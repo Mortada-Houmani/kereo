@@ -264,8 +264,8 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
               <div className="modal-runtime-note fade-in">
                 <Globe size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                 <p>
-                  Kereo will use static-site defaults for port and health checks, but SPA frameworks may
-                  still need their own base-path config for <span className="mono">/apps/&lt;slug&gt;</span> hosting.
+                  Kereo will publish static sites on their own subdomain, so most React and Vite apps can
+                  keep their default root configuration.
                 </p>
               </div>
             )}

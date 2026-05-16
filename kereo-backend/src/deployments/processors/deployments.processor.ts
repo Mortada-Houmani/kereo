@@ -29,7 +29,6 @@ import {
   DeploymentPhase,
   DeploymentStatus,
 } from '../entities/deployment.entity';
-import { ProjectRuntimeType } from '../../projects/entities/project.entity';
 
 @Injectable()
 @Processor('deployments', {
@@ -69,8 +68,6 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
     const dockerfilePath = deployment.project.dockerfilePath ?? 'Dockerfile';
     const buildContext = deployment.project.buildContext ?? '.';
     const port = deployment.project.port ?? 3000;
-    const runtimeType =
-      deployment.project.runtimeType ?? ProjectRuntimeType.WEB_SERVER;
 
     try {
       const awsRegion = process.env.AWS_REGION;
@@ -214,9 +211,6 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             `Branch: ${branch}`,
             `Build context: ${buildContext}`,
             `Dockerfile: ${dockerfilePath}`,
-            ...(runtimeType === ProjectRuntimeType.STATIC_SITE
-              ? [`Base path: /apps/${deployment.project.slug}/`]
-              : []),
             '',
           ].join('\n'),
         );
@@ -250,10 +244,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             imageUri: ecrImageTag,
             ecrRegistry,
             port,
-            appBasePath:
-              runtimeType === ProjectRuntimeType.STATIC_SITE
-                ? `/apps/${projectSlug}/`
-                : '/',
+            appBasePath: '/',
           });
 
       if (!existingCodeBuildId) {

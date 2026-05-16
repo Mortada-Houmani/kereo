@@ -132,9 +132,10 @@ export class AwsProvisioningService implements OnModuleInit {
         listenerArn: albListenerArn as string,
         slug: input.slug,
         targetGroupArn,
+        publicBaseUrl,
       });
 
-      const publicUrl = `${publicBaseUrl}/apps/${input.slug}`;
+      const publicUrl = this.buildProjectPublicUrl(publicBaseUrl, input.slug);
 
       this.logger.log(`Public URL for project: ${publicUrl}`);
 
@@ -210,18 +211,21 @@ export class AwsProvisioningService implements OnModuleInit {
       listenerArn: string;
       slug: string;
       targetGroupArn: string;
+      publicBaseUrl: string;
     },
   ) {
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       const priority = this.generateListenerRulePriority();
-      const pathPatterns = [`/apps/${input.slug}`, `/apps/${input.slug}/*`];
-      const escapedSlug = input.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const projectHost = this.buildProjectHostname(
+        input.publicBaseUrl,
+        input.slug,
+      );
 
       this.logger.log(
         `Creating listener rule on listener: ${input.listenerArn}`,
       );
       this.logger.log(
-        `Creating listener rule for /apps/${input.slug} with priority ${priority}`,
+        `Creating listener rule for host ${projectHost} with priority ${priority}`,
       );
 
       try {
@@ -231,27 +235,16 @@ export class AwsProvisioningService implements OnModuleInit {
             Priority: priority,
             Conditions: [
               {
-                Field: 'path-pattern',
-                Values: pathPatterns,
+                Field: 'host-header',
+                HostHeaderConfig: {
+                  Values: [projectHost],
+                },
               },
             ],
             Actions: [
               {
                 Type: 'forward',
                 TargetGroupArn: input.targetGroupArn,
-              },
-            ],
-            Transforms: [
-              {
-                Type: 'url-rewrite',
-                UrlRewriteConfig: {
-                  Rewrites: [
-                    {
-                      Regex: `^/apps/${escapedSlug}/?(.*)$`,
-                      Replace: '/$1',
-                    },
-                  ],
-                },
               },
             ],
           }),
@@ -289,6 +282,21 @@ export class AwsProvisioningService implements OnModuleInit {
       .replace(/-+$/g, '');
 
     return `${prefix}-${suffix}`.slice(0, 32).replace(/-+$/g, '');
+  }
+
+  private buildProjectPublicUrl(publicBaseUrl: string, slug: string) {
+    const url = new URL(publicBaseUrl);
+    url.hostname = this.buildProjectHostname(publicBaseUrl, slug);
+    url.pathname = '/';
+    url.search = '';
+    url.hash = '';
+
+    return url.toString().replace(/\/$/, '');
+  }
+
+  private buildProjectHostname(publicBaseUrl: string, slug: string) {
+    const url = new URL(publicBaseUrl);
+    return `${slug}.${url.hostname}`;
   }
 
   private async createProjectSecurityGroup(
