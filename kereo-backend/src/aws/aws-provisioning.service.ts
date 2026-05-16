@@ -183,7 +183,7 @@ export class AwsProvisioningService implements OnModuleInit {
     for (let attempt = 1; attempt <= 5; attempt += 1) {
       const priority = this.generateListenerRulePriority();
       const pathPatterns = [`/apps/${input.slug}`, `/apps/${input.slug}/*`];
-      const rewriteRegex = `^/apps/${input.slug}(/.*)?$`;
+      const escapedSlug = input.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       this.logger.log(
         `Creating listener rule on listener: ${input.listenerArn}`,
@@ -215,7 +215,11 @@ export class AwsProvisioningService implements OnModuleInit {
                 UrlRewriteConfig: {
                   Rewrites: [
                     {
-                      Regex: rewriteRegex,
+                      Regex: `^/apps/${escapedSlug}$`,
+                      Replace: '/',
+                    },
+                    {
+                      Regex: `^/apps/${escapedSlug}(/.*)$`,
                       Replace: '$1',
                     },
                   ],
