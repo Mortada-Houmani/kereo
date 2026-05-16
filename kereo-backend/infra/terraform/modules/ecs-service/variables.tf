@@ -68,10 +68,6 @@ variable "alb_listener_arn" {
   type = string
 }
 
-variable "alb_security_group_id" {
-  type = string
-}
-
 variable "public_base_url" {
   type = string
 }
