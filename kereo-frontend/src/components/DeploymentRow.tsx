@@ -1,4 +1,4 @@
-import { GitCommit, Clock } from 'lucide-react';
+import { GitCommit, ChevronRight } from 'lucide-react';
 import type { DeploymentSummary } from '../lib/api';
 import { StatusBadge } from './StatusBadge';
 import { timeAgo, shortSha, formatDuration, getPhaseMeta } from '../lib/utils';
@@ -18,23 +18,31 @@ export function DeploymentRow({ dep, active, onClick }: Props) {
       className={`deployment-row ${active ? 'active' : ''}`}
       onClick={onClick}
     >
-      <div className="dep-row-top">
-        <StatusBadge status={dep.status} size="sm" />
-        <span className="dep-phase-label">{dep.phaseLabel ?? phase.label}</span>
-        <span className="dep-duration mono">{formatDuration(dep.durationMs)}</span>
-      </div>
-      <div className="dep-row-bottom">
-        {dep.commitSha && (
-          <span className="mono dep-meta">
-            <GitCommit size={10} strokeWidth={2} />
-            {shortSha(dep.commitSha)}
+      <div className="dep-row-main">
+        <div className="dep-row-header">
+          <StatusBadge status={dep.status} size="sm" />
+          <span className="dep-row-id mono">#{dep.id.slice(0, 7)}</span>
+          <span className="dep-row-time mono">
+            {timeAgo(dep.createdAt)}
           </span>
-        )}
-        <span className="dep-meta mono">
-          <Clock size={10} strokeWidth={2} />
-          {timeAgo(dep.createdAt)}
-        </span>
-        <span className="dep-id mono">#{dep.id.slice(0, 6)}</span>
+        </div>
+        
+        <div className="dep-row-info">
+          <span className="dep-phase-label">{dep.phaseLabel ?? phase.label}</span>
+          <div className="dep-meta-group">
+            {dep.commitSha && (
+              <span className="chip chip-xs">
+                <GitCommit size={10} strokeWidth={2} />
+                {shortSha(dep.commitSha)}
+              </span>
+            )}
+            <span className="dep-duration mono">{formatDuration(dep.durationMs)}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="dep-row-chevron">
+        <ChevronRight size={14} strokeWidth={2} />
       </div>
     </button>
   );

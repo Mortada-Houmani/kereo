@@ -34,6 +34,14 @@ output "alb_listener_arn" {
   value = module.alb.listener_arn
 }
 
+output "frontend_target_group_arn" {
+  value = module.alb.frontend_target_group_arn
+}
+
+output "frontend_ecs_service_name" {
+  value = module.frontend_service.service_name
+}
+
 output "rds_endpoint" {
   value = module.rds.db_endpoint
 }

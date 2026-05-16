@@ -6,6 +6,14 @@ output "target_group_arn" {
   value = aws_lb_target_group.ecs.arn
 }
 
+output "api_target_group_arn" {
+  value = aws_lb_target_group.ecs.arn
+}
+
+output "frontend_target_group_arn" {
+  value = aws_lb_target_group.frontend.arn
+}
+
 output "alb_security_group_id" {
   value = aws_security_group.alb.id
 }

@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutGrid, LogOut, Rocket, ChevronRight,
+  LayoutGrid, LogOut, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import './Sidebar.css';
@@ -16,8 +16,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <Rocket size={20} strokeWidth={2.2} style={{ color: 'var(--accent)' }} />
-        <span className="sidebar-logo-text">Kereo</span>
+        <img src="/logo.png" alt="Kereo" className="sidebar-logo-image" />
       </div>
 
       <nav className="sidebar-nav">

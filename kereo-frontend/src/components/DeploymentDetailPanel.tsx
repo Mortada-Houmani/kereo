@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  ExternalLink, GitCommit, Clock, Hash,
-  ChevronDown, ChevronUp, AlertTriangle, Database,
+  ExternalLink, GitCommit,
+  ChevronDown, ChevronUp, AlertCircle, Database,
+  Terminal, ArrowRight, Server
 } from 'lucide-react';
 import type { DeploymentSummary, DeploymentDetail } from '../lib/api';
 import { deploymentsApi } from '../lib/api';
@@ -17,12 +18,11 @@ interface Props {
 
 export function DeploymentDetailPanel({ dep }: Props) {
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
-  const [logsOpen, setLogsOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     setDetail(null);
-    setLogsOpen(false);
     setLoadingDetail(true);
     deploymentsApi.get(dep.id)
       .then(r => setDetail(r.data))
@@ -34,117 +34,150 @@ export function DeploymentDetailPanel({ dep }: Props) {
   const errSummary = errorSummary(dep.errorMessage);
 
   return (
-    <div className="dep-detail-panel card fade-in">
-      <div className="dep-detail-header">
-        <div>
-          <StatusBadge status={dep.status} />
-          <span className="dep-detail-id mono">#{dep.id.slice(0, 8)}</span>
-        </div>
-        <div className="dep-detail-times">
-          <span className="mono">
-            <Clock size={11} strokeWidth={2} />
-            {timeAgo(dep.createdAt)}
-          </span>
-          <span className="mono">
-            {formatDuration(dep.durationMs)}
-          </span>
-        </div>
-      </div>
-
-      {/* Phase timeline */}
-      <div className="phase-timeline">
-        {PHASES.map((phase, idx) => {
-          const meta = getPhaseMeta(phase);
-          let state: 'done' | 'active' | 'pending' | 'failed' = 'pending';
-          if (dep.status === 'failed' && dep.phase === phase) state = 'failed';
-          else if (dep.status === 'failed' && idx > currentPhaseStep) state = 'pending';
-          else if (idx < currentPhaseStep || dep.status === 'success') state = 'done';
-          else if (idx === currentPhaseStep) state = 'active';
-
-          return (
-            <div key={phase} className={`phase-item phase-${state}`}>
-              <div className="phase-dot" />
-              {idx < PHASES.length - 1 && <div className="phase-connector" />}
-              <span className="phase-label">{meta.label}</span>
+    <div className="dep-detail-panel scale-in">
+      <div className="dep-detail-header-card card">
+        <div className="dep-detail-header-top">
+          <div className="dep-detail-id-group">
+            <span className="section-label">Deployment</span>
+            <div className="dep-id-row">
+              <span className="dep-detail-id mono">#{dep.id.slice(0, 12)}</span>
+              <StatusBadge status={dep.status} />
             </div>
-          );
-        })}
+          </div>
+          <div className="dep-detail-stats">
+            <div className="dep-stat-item">
+              <span className="dep-stat-label">Duration</span>
+              <span className="dep-stat-value mono">{formatDuration(dep.durationMs)}</span>
+            </div>
+            <div className="dep-stat-item">
+              <span className="dep-stat-label">Created</span>
+              <span className="dep-stat-value mono">{timeAgo(dep.createdAt)}</span>
+            </div>
+          </div>
+        </div>
+
+        {dep.status !== 'success' && dep.status !== 'failed' && (
+          <div className="deploy-progress-bar">
+            <div className="deploy-progress-fill" />
+          </div>
+        )}
+
+        {/* Phase timeline — Horizontal & Product-grade */}
+        <div className="timeline-container">
+          <div className="timeline-progress">
+            {PHASES.map((phase, idx) => {
+              const meta = getPhaseMeta(phase);
+              let state: 'done' | 'active' | 'pending' | 'failed' = 'pending';
+              
+              if (dep.status === 'failed' && dep.phase === phase) state = 'failed';
+              else if (dep.status === 'failed' && idx > currentPhaseStep) state = 'pending';
+              else if (idx < currentPhaseStep || dep.status === 'success') state = 'done';
+              else if (idx === currentPhaseStep) state = 'active';
+
+              return (
+                <div key={phase} className={`timeline-step step-${state}`}>
+                  <div className="step-dot">
+                    {state === 'done' && <div className="step-check" />}
+                  </div>
+                  <span className="step-label">{meta.label}</span>
+                  {idx < PHASES.length - 1 && <div className="step-line" />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Error summary */}
+      {/* Error Summary — prominent but clean */}
       {dep.status === 'failed' && errSummary && (
-        <div className="dep-error-box">
-          <div className="dep-error-title">
-            <AlertTriangle size={13} strokeWidth={2} />
-            Failure reason
+        <div className="failure-summary fade-in">
+          <div className="failure-summary-icon">
+            <AlertCircle size={18} strokeWidth={2.5} />
           </div>
-          <p className="dep-error-text">{errSummary}</p>
+          <div className="failure-summary-content">
+            <div className="failure-summary-title">Deployment failed</div>
+            <p className="failure-summary-text">{errSummary}</p>
+          </div>
         </div>
       )}
 
-      {/* Metadata */}
-      <div className="dep-detail-meta">
-        {dep.commitSha && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><GitCommit size={11} /> Commit</span>
-            <span className="dep-meta-value mono">{shortSha(dep.commitSha)}</span>
+      {/* Details Grid */}
+      <div className="dep-meta-grid">
+        <div className="dep-meta-card card">
+          <span className="section-label" style={{ marginBottom: 12, display: 'block' }}>Infrastructure</span>
+          <div className="dep-meta-list">
+            {dep.codebuildBuildId && (
+              <div className="dep-meta-entry">
+                <span className="dep-meta-entry-label"><Terminal size={12} /> Build ID</span>
+                <span className="dep-meta-entry-value mono">{dep.codebuildBuildId.split(':').pop()}</span>
+              </div>
+            )}
+            {dep.taskDefinitionArn && (
+              <div className="dep-meta-entry">
+                <span className="dep-meta-entry-label"><Server size={12} /> Task Definition</span>
+                <span className="dep-meta-entry-value mono" title={dep.taskDefinitionArn}>
+                  {dep.taskDefinitionArn.split('/').pop()}
+                </span>
+              </div>
+            )}
+            {dep.databaseName && (
+              <div className="dep-meta-entry">
+                <span className="dep-meta-entry-label"><Database size={12} /> Database</span>
+                <span className="dep-meta-entry-value mono">{dep.databaseName}</span>
+              </div>
+            )}
           </div>
-        )}
-        {dep.liveUrl && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><ExternalLink size={11} /> Live URL</span>
-            <a href={dep.liveUrl} target="_blank" rel="noopener noreferrer" className="dep-meta-link">
-              {dep.liveUrl.replace(/^https?:\/\//, '')}
-            </a>
+        </div>
+
+        <div className="dep-meta-card card">
+          <span className="section-label" style={{ marginBottom: 12, display: 'block' }}>Source</span>
+          <div className="dep-meta-list">
+            {dep.commitSha && (
+              <div className="dep-meta-entry">
+                <span className="dep-meta-entry-label"><GitCommit size={12} /> Commit</span>
+                <span className="dep-meta-entry-value mono">{shortSha(dep.commitSha)}</span>
+              </div>
+            )}
+            {dep.liveUrl && (
+              <div className="dep-meta-entry">
+                <span className="dep-meta-entry-label"><ExternalLink size={12} /> Live URL</span>
+                <a href={dep.liveUrl} target="_blank" rel="noopener noreferrer" className="dep-meta-entry-link">
+                  Open Deployment <ArrowRight size={10} />
+                </a>
+              </div>
+            )}
           </div>
-        )}
-        {dep.codebuildBuildId && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><Hash size={11} /> Build ID</span>
-            <span className="dep-meta-value mono">{dep.codebuildBuildId.split(':').pop()}</span>
-          </div>
-        )}
-        {dep.codebuildStatus && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><Hash size={11} /> Build Status</span>
-            <span className="dep-meta-value mono">{dep.codebuildStatus}</span>
-          </div>
-        )}
-        {dep.taskDefinitionArn && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><Hash size={11} /> Task Def</span>
-            <span className="dep-meta-value mono" title={dep.taskDefinitionArn}>
-              {dep.taskDefinitionArn.split('/').pop()}
-            </span>
-          </div>
-        )}
-        {dep.databaseName && (
-          <div className="dep-meta-row">
-            <span className="dep-meta-label"><Database size={11} /> DB Name</span>
-            <span className="dep-meta-value mono">{dep.databaseName}</span>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Logs expander */}
-      <div className="dep-logs-section">
-        <button
-          className="dep-logs-toggle"
-          onClick={() => setLogsOpen(o => !o)}
-        >
-          {logsOpen ? <ChevronUp size={14} strokeWidth={2} /> : <ChevronDown size={14} strokeWidth={2} />}
-          {logsOpen ? 'Hide logs' : 'Show logs'}
-          {loadingDetail && <span className="spinner" style={{ width: 12, height: 12, marginLeft: 6 }} />}
-        </button>
+      {/* Logs section — Terminal-like */}
+      <div className="logs-container card">
+        <div className="logs-header">
+          <div className="logs-header-left">
+            <Terminal size={14} strokeWidth={2} style={{ color: 'var(--text-secondary)' }} />
+            <span className="section-label">Deployment Logs</span>
+            {loadingDetail && <div className="spinner" style={{ width: 10, height: 10 }} />}
+          </div>
+          <button 
+            className="btn btn-xs btn-ghost" 
+            onClick={() => setLogsOpen(!logsOpen)}
+          >
+            {logsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            {logsOpen ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+
         {logsOpen && (
-          <div className="log-block" style={{ marginTop: 10 }}>
-            {detail?.logs
-              ? detail.logs
-              : loadingDetail
-                ? 'Loading logs…'
-                : dep.status === 'failed' && dep.errorMessage
-                  ? dep.errorMessage
-                  : 'No logs available.'}
+          <div className="logs-viewer-wrapper">
+            <div className="log-block">
+              {detail?.logs
+                ? detail.logs
+                : loadingDetail
+                  ? 'Initializing log stream…'
+                  : dep.status === 'failed' && dep.errorMessage
+                    ? `[ERROR] ${dep.errorMessage}`
+                    : 'Log buffer empty.'}
+            </div>
           </div>
         )}
       </div>

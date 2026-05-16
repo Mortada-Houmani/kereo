@@ -1,58 +1,104 @@
 .deployment-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
   width: 100%;
   text-align: left;
+  transition: all .12s;
+  position: relative;
+  overflow: hidden;
+}
+
+.deployment-row:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-bright);
+}
+
+.deployment-row.active {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.deployment-row.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+}
+
+.dep-row-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: all .15s;
-}
-.deployment-row:hover {
-  background: var(--bg-elevated);
-  border-color: var(--border);
-}
-.deployment-row.active {
-  background: var(--accent-dim);
-  border-color: rgba(181,255,77,.25);
+  min-width: 0;
 }
 
-.dep-row-top {
+.dep-row-header {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.dep-phase-label {
-  font-size: .75rem;
+
+.dep-row-id {
+  font-size: .68rem;
   color: var(--text-muted);
-  flex: 1;
+}
+
+.dep-row-time {
+  font-size: .68rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.dep-row-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.dep-phase-label {
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.dep-duration {
-  font-size: .72rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
+
+.dep-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.dep-row-bottom {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.dep-meta {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: .7rem;
+.dep-duration {
+  font-size: .68rem;
   color: var(--text-muted);
 }
-.dep-id {
+
+.dep-row-chevron {
+  color: var(--text-disabled);
+  transition: transform .15s, color .15s;
+}
+
+.deployment-row:hover .dep-row-chevron {
+  color: var(--text-muted);
+  transform: translateX(2px);
+}
+
+.deployment-row.active .dep-row-chevron {
+  color: var(--accent);
+}
+
+.chip-xs {
+  padding: 1px 6px;
   font-size: .68rem;
-  color: var(--border-bright);
-  margin-left: auto;
 }

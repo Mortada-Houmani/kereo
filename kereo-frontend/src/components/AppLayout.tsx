@@ -1,11 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import './AppLayout.css';
 
 export function AppLayout() {
   return (
-    <div style={{ display: 'flex', minHeight: '100dvh' }}>
+    <div className="app-shell">
       <Sidebar />
-      <main style={{ flex: 1, minWidth: 0, overflowX: 'hidden' }}>
+      <main className="app-main">
         <Outlet />
       </main>
     </div>

@@ -62,6 +62,10 @@ variable "container_image" {
   type = string
 }
 
+variable "frontend_container_image" {
+  type = string
+}
+
 variable "certificate_arn" {
   type    = string
   default = null

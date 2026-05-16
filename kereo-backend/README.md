@@ -71,7 +71,7 @@ Settings -> Webhooks -> Add webhook
 Use:
 
 ```text
-Payload URL: https://kereo.online/webhooks/github
+Payload URL: https://kereo.online/api/webhooks/github
 Content type: application/json
 Secret: same value as GITHUB_WEBHOOK_SECRET
 Events: Just the push event

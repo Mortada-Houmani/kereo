@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   position: relative;
+  background: radial-gradient(circle at center, #15151a 0%, #0b0b0d 100%);
   overflow: hidden;
 }
 
@@ -11,61 +12,65 @@
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,.03) 1px, transparent 1px);
-  background-size: 48px 48px;
+    linear-gradient(to right, rgba(255,255,255,.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(circle at center, black 0%, transparent 80%);
   pointer-events: none;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 400px;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 40px;
+  border: 1px solid var(--border-bright);
+  border-radius: var(--radius-xl);
+  padding: 48px;
   position: relative;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-xl);
+  z-index: 1;
 }
 
 .auth-logo {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.02em;
-  margin-bottom: 28px;
+  margin-bottom: 32px;
 }
 
 .auth-title {
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
-  margin-bottom: 6px;
+  letter-spacing: -0.04em;
+  margin-bottom: 8px;
+  color: var(--text-primary);
 }
 
 .auth-subtitle {
-  font-size: .875rem;
+  font-size: .85rem;
   color: var(--text-secondary);
-  margin-bottom: 28px;
-  line-height: 1.5;
+  margin-bottom: 32px;
+  line-height: 1.6;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .auth-switch {
-  margin-top: 22px;
+  margin-top: 32px;
   text-align: center;
-  font-size: .82rem;
-  color: var(--text-secondary);
+  font-size: .8rem;
+  color: var(--text-muted);
 }
 .auth-switch a {
   color: var(--accent);
   font-weight: 600;
+  transition: color .12s;
 }
-.auth-switch a:hover { text-decoration: underline; }
+.auth-switch a:hover { color: var(--accent-hover); }

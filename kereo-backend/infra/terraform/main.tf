@@ -116,7 +116,7 @@ module "ecs_service" {
   vpc_id                = module.network.vpc_id
   subnet_ids            = module.network.public_subnet_ids
   alb_security_group_id = module.alb.alb_security_group_id
-  target_group_arn      = module.alb.target_group_arn
+  target_group_arn      = module.alb.api_target_group_arn
   alb_dns_name          = module.alb.alb_dns_name
   alb_listener_arn      = module.alb.listener_arn
   public_base_url       = var.public_base_url
@@ -134,5 +134,23 @@ module "ecs_service" {
   typeorm_synchronize         = var.typeorm_synchronize
 
   container_port = 3000
+  desired_count  = 1
+}
+
+module "frontend_service" {
+  source = "./modules/frontend-service"
+
+  project_name            = var.project_name
+  cluster_id              = module.ecs.cluster_arn
+  task_execution_role_arn = module.iam.ecs_task_execution_role_arn
+
+  container_image       = var.frontend_container_image
+  vpc_id                = module.network.vpc_id
+  subnet_ids            = module.network.public_subnet_ids
+  alb_security_group_id = module.alb.alb_security_group_id
+  target_group_arn      = module.alb.frontend_target_group_arn
+  aws_region            = var.aws_region
+
+  container_port = 80
   desired_count  = 1
 }

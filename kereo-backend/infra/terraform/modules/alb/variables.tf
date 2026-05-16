@@ -24,3 +24,13 @@ variable "domain_name" {
   type    = string
   default = null
 }
+
+variable "api_health_check_path" {
+  type    = string
+  default = "/api/health"
+}
+
+variable "frontend_health_check_path" {
+  type    = string
+  default = "/"
+}

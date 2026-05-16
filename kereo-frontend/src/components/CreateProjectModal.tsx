@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, GitBranch, Terminal, Globe, Server, AlertTriangle } from 'lucide-react';
 import { projectsApi, type CreateProjectDto } from '../lib/api';
 import './CreateProjectModal.css';
 
@@ -47,95 +47,144 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
 
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-panel fade-in">
+      <div className="modal-panel scale-in">
         <div className="modal-header">
-          <h2 className="modal-title">New Project</h2>
-          <button className="modal-close" onClick={onClose}><X size={18} /></button>
+          <div className="modal-title-group">
+            <h2 className="modal-title">New Project</h2>
+            <p className="modal-subtitle">Connect a repository to deploy as an ECS service.</p>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-form">
-          <div className="modal-grid">
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label className="label" htmlFor="proj-name">Project Name *</label>
-              <input
-                id="proj-name"
-                value={form.name}
-                onChange={e => set('name', e.target.value)}
-                placeholder="my-app"
-                required
-              />
+          <div className="modal-body">
+            {/* General Info */}
+            <div className="form-section">
+              <span className="section-label">General Information</span>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="label" htmlFor="proj-name">
+                    Display Name
+                    <span className="label-hint">(Internal identifier)</span>
+                  </label>
+                  <input
+                    id="proj-name"
+                    value={form.name}
+                    onChange={e => set('name', e.target.value)}
+                    placeholder="e.g. backend-api"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="field" style={{ gridColumn: '1 / -1' }}>
-              <label className="label" htmlFor="proj-repo">GitHub Repo URL *</label>
-              <input
-                id="proj-repo"
-                value={form.repoUrl}
-                onChange={e => set('repoUrl', e.target.value)}
-                placeholder="https://github.com/your-org/my-app"
-                required
-              />
+            {/* Repository Info */}
+            <div className="form-section">
+              <span className="section-label">Repository Configuration</span>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="label" htmlFor="proj-repo">
+                    <Globe size={11} style={{ marginRight: 4 }} />
+                    GitHub Repository URL
+                  </label>
+                  <input
+                    id="proj-repo"
+                    value={form.repoUrl}
+                    onChange={e => set('repoUrl', e.target.value)}
+                    placeholder="https://github.com/org/repo"
+                    required
+                    disabled={loading}
+                  />
+                  <span className="field-hint">Public repository for now.</span>
+                </div>
+
+                <div className="field">
+                  <label className="label" htmlFor="proj-branch">
+                    <GitBranch size={11} style={{ marginRight: 4 }} />
+                    Default Branch
+                  </label>
+                  <input
+                    id="proj-branch"
+                    value={form.branch}
+                    onChange={e => set('branch', e.target.value)}
+                    placeholder="main"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="field">
-              <label className="label" htmlFor="proj-branch">Branch</label>
-              <input
-                id="proj-branch"
-                value={form.branch}
-                onChange={e => set('branch', e.target.value)}
-                placeholder="main"
-              />
+            {/* Infrastructure Settings */}
+            <div className="form-section">
+              <span className="section-label">Infrastructure & Build</span>
+              <div className="form-grid">
+                <div className="field">
+                  <label className="label" htmlFor="proj-port">
+                    <Server size={11} style={{ marginRight: 4 }} />
+                    App Port
+                  </label>
+                  <input
+                    id="proj-port"
+                    type="number"
+                    value={form.port}
+                    onChange={e => set('port', e.target.value)}
+                    placeholder="3000"
+                    disabled={loading}
+                  />
+                  <span className="field-hint">Traffic is routed here.</span>
+                </div>
+
+                <div className="field">
+                  <label className="label" htmlFor="proj-dockerfile">
+                    <Terminal size={11} style={{ marginRight: 4 }} />
+                    Dockerfile
+                  </label>
+                  <input
+                    id="proj-dockerfile"
+                    value={form.dockerfilePath}
+                    onChange={e => set('dockerfilePath', e.target.value)}
+                    placeholder="Dockerfile"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="field" style={{ gridColumn: 'span 2' }}>
+                  <label className="label" htmlFor="proj-context">Build Context</label>
+                  <input
+                    id="proj-context"
+                    value={form.buildContext}
+                    onChange={e => set('buildContext', e.target.value)}
+                    placeholder="."
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="field">
-              <label className="label" htmlFor="proj-port">Port</label>
-              <input
-                id="proj-port"
-                type="number"
-                value={form.port}
-                onChange={e => set('port', e.target.value)}
-                placeholder="3000"
-              />
+            {/* Warning Box */}
+            <div className="modal-warning">
+              <AlertTriangle size={14} style={{ color: 'var(--yellow)', flexShrink: 0 }} />
+              <p>
+                Kereo will provision an ECS Service, CloudWatch logs, and an RDS database. 
+                Initial setup takes about 20s.
+              </p>
             </div>
 
-            <div className="field">
-              <label className="label" htmlFor="proj-dockerfile">Dockerfile Path</label>
-              <input
-                id="proj-dockerfile"
-                value={form.dockerfilePath}
-                onChange={e => set('dockerfilePath', e.target.value)}
-                placeholder="Dockerfile"
-              />
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="proj-context">Build Context</label>
-              <input
-                id="proj-context"
-                value={form.buildContext}
-                onChange={e => set('buildContext', e.target.value)}
-                placeholder="."
-              />
-            </div>
+            {error && (
+              <div className="field-error fade-in" style={{ marginTop: 12 }}>
+                {error}
+              </div>
+            )}
           </div>
-
-          <div className="modal-info">
-            <span style={{ color: 'var(--yellow)', fontSize: '.75rem', fontWeight: 500 }}>⚡</span>
-            <p>
-              Creating a project will provision an ECS service, target group, CloudWatch log group,
-              and SSM parameter on AWS. This may take 15–30 seconds.
-            </p>
-          </div>
-
-          {error && <p className="field-error">{error}</p>}
 
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <Loader2 size={15} className="spin-icon" /> : null}
-              {loading ? 'Provisioning AWS…' : 'Create Project'}
+              {loading ? <Loader2 size={14} className="spin-anim" /> : null}
+              {loading ? 'Provisioning Resources…' : 'Create & Deploy'}
             </button>
           </div>
         </form>
