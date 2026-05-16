@@ -93,6 +93,7 @@ export class ProjectsService {
 
       savedProject.targetGroupArn = provisioningResult.targetGroupArn;
       savedProject.listenerRuleArn = provisioningResult.listenerRuleArn;
+      savedProject.ecsSecurityGroupId = provisioningResult.ecsSecurityGroupId;
       savedProject.publicUrl = provisioningResult.publicUrl;
       await this.projectsRepository.save(savedProject);
 
@@ -162,6 +163,7 @@ export class ProjectsService {
         ecsTaskFamily: project.ecsTaskFamily,
         targetGroupArn: project.targetGroupArn,
         listenerRuleArn: project.listenerRuleArn,
+        ecsSecurityGroupId: project.ecsSecurityGroupId,
       });
     } catch (error) {
       this.logger.error(

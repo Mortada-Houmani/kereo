@@ -30,7 +30,8 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     await this.dataSource.query(`
       ALTER TABLE projects
         ADD COLUMN IF NOT EXISTS "runtimeType" varchar NOT NULL DEFAULT 'web-server',
-        ADD COLUMN IF NOT EXISTS "healthCheckPath" varchar NOT NULL DEFAULT '/'
+        ADD COLUMN IF NOT EXISTS "healthCheckPath" varchar NOT NULL DEFAULT '/',
+        ADD COLUMN IF NOT EXISTS "ecsSecurityGroupId" varchar
     `);
 
     await this.dataSource.query(`

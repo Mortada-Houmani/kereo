@@ -134,6 +134,10 @@ resource "aws_ecs_task_definition" "this" {
           value = var.alb_listener_arn
         },
         {
+          name  = "ALB_SECURITY_GROUP_ID"
+          value = var.alb_security_group_id
+        },
+        {
           name  = "PUBLIC_BASE_URL"
           value = var.public_base_url
         }

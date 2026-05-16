@@ -63,6 +63,9 @@ export class Project {
   listenerRuleArn: string;
 
   @Column({ nullable: true })
+  ecsSecurityGroupId: string;
+
+  @Column({ nullable: true })
   publicUrl: string;
 
   @ManyToOne(() => User, (user) => user.projects, {

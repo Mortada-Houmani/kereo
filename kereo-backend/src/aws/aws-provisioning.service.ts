@@ -14,6 +14,12 @@ import {
   DeleteTargetGroupCommand,
   ElasticLoadBalancingV2Client,
 } from '@aws-sdk/client-elastic-load-balancing-v2';
+import {
+  AuthorizeSecurityGroupIngressCommand,
+  CreateSecurityGroupCommand,
+  DeleteSecurityGroupCommand,
+  EC2Client,
+} from '@aws-sdk/client-ec2';
 
 type ProvisionProjectInput = {
   slug: string;
@@ -24,6 +30,7 @@ type ProvisionProjectInput = {
 type ProvisionProjectResult = {
   targetGroupArn: string;
   listenerRuleArn: string;
+  ecsSecurityGroupId: string;
   publicUrl: string;
 };
 
@@ -32,6 +39,7 @@ type DeleteProjectResourcesInput = {
   ecsTaskFamily?: string | null;
   targetGroupArn?: string | null;
   listenerRuleArn?: string | null;
+  ecsSecurityGroupId?: string | null;
 };
 
 @Injectable()
@@ -55,6 +63,7 @@ export class AwsProvisioningService implements OnModuleInit {
     const awsRegion = process.env.AWS_REGION;
     const vpcId = process.env.VPC_ID;
     const albListenerArn = process.env.ALB_LISTENER_ARN;
+    const albSecurityGroupId = process.env.ALB_SECURITY_GROUP_ID;
     const publicBaseUrl = this.getPublicBaseUrl();
     const albDnsNameFallback = process.env.PUBLIC_BASE_URL
       ? 'configured'
@@ -64,6 +73,7 @@ export class AwsProvisioningService implements OnModuleInit {
       ['AWS_REGION', awsRegion],
       ['VPC_ID', vpcId],
       ['ALB_LISTENER_ARN', albListenerArn],
+      ['ALB_SECURITY_GROUP_ID', albSecurityGroupId],
       ['ALB_DNS_NAME', albDnsNameFallback],
     ]
       .filter(([, value]) => !value)
@@ -78,12 +88,23 @@ export class AwsProvisioningService implements OnModuleInit {
     const client = new ElasticLoadBalancingV2Client({
       region: awsRegion,
     });
+    const ec2Client = new EC2Client({
+      region: awsRegion,
+    });
 
     const targetGroupName = this.buildTargetGroupName(input.slug);
     let targetGroupArn: string | undefined;
     let listenerRuleArn: string | undefined;
+    let ecsSecurityGroupId: string | undefined;
 
     try {
+      ecsSecurityGroupId = await this.createProjectSecurityGroup(ec2Client, {
+        projectSlug: input.slug,
+        vpcId: vpcId as string,
+        albSecurityGroupId: albSecurityGroupId as string,
+        port: input.port,
+      });
+
       this.logger.log(`Creating target group ${targetGroupName}`);
 
       const targetGroupResult = await client.send(
@@ -117,9 +138,14 @@ export class AwsProvisioningService implements OnModuleInit {
 
       this.logger.log(`Public URL for project: ${publicUrl}`);
 
+      if (!ecsSecurityGroupId) {
+        throw new Error('AWS did not return a project ECS security group id');
+      }
+
       return {
         targetGroupArn,
         listenerRuleArn,
+        ecsSecurityGroupId,
         publicUrl,
       };
     } catch (error) {
@@ -132,6 +158,7 @@ export class AwsProvisioningService implements OnModuleInit {
         listenerRuleArn,
         targetGroupArn,
       });
+      await this.deleteSecurityGroup(ec2Client, ecsSecurityGroupId);
 
       throw error;
     }
@@ -147,6 +174,7 @@ export class AwsProvisioningService implements OnModuleInit {
 
     const ecsClient = new ECSClient({ region: awsRegion });
     const elbClient = new ElasticLoadBalancingV2Client({ region: awsRegion });
+    const ec2Client = new EC2Client({ region: awsRegion });
 
     if (input.ecsServiceName) {
       if (!ecsClusterName) {
@@ -169,6 +197,10 @@ export class AwsProvisioningService implements OnModuleInit {
 
     if (input.targetGroupArn) {
       await this.deleteTargetGroup(elbClient, input.targetGroupArn);
+    }
+
+    if (input.ecsSecurityGroupId) {
+      await this.deleteSecurityGroup(ec2Client, input.ecsSecurityGroupId);
     }
   }
 
@@ -257,6 +289,80 @@ export class AwsProvisioningService implements OnModuleInit {
       .replace(/-+$/g, '');
 
     return `${prefix}-${suffix}`.slice(0, 32).replace(/-+$/g, '');
+  }
+
+  private async createProjectSecurityGroup(
+    ec2Client: EC2Client,
+    input: {
+      projectSlug: string;
+      vpcId: string;
+      albSecurityGroupId: string;
+      port: number;
+    },
+  ) {
+    const groupName = this.buildProjectSecurityGroupName(input.projectSlug);
+    this.logger.log(`Creating project security group ${groupName}`);
+
+    const securityGroupResult = await ec2Client.send(
+      new CreateSecurityGroupCommand({
+        GroupName: groupName,
+        Description: `Kereo project task access for ${input.projectSlug}`,
+        VpcId: input.vpcId,
+        TagSpecifications: [
+          {
+            ResourceType: 'security-group',
+            Tags: [
+              {
+                Key: 'Name',
+                Value: groupName,
+              },
+              {
+                Key: 'Project',
+                Value: input.projectSlug,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    const securityGroupId = securityGroupResult.GroupId;
+
+    if (!securityGroupId) {
+      throw new Error('AWS did not return a project security group id');
+    }
+
+    await ec2Client.send(
+      new AuthorizeSecurityGroupIngressCommand({
+        GroupId: securityGroupId,
+        IpPermissions: [
+          {
+            IpProtocol: 'tcp',
+            FromPort: input.port,
+            ToPort: input.port,
+            UserIdGroupPairs: [
+              {
+                GroupId: input.albSecurityGroupId,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    return securityGroupId;
+  }
+
+  private buildProjectSecurityGroupName(slug: string) {
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const prefix = `kereo-${slug}-tasks`
+      .replace(/[^a-zA-Z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 20)
+      .replace(/-+$/g, '');
+
+    return `${prefix}-${suffix}`.slice(0, 255).replace(/-+$/g, '');
   }
 
   private generateListenerRulePriority() {
@@ -458,6 +564,34 @@ export class AwsProvisioningService implements OnModuleInit {
 
         throw error;
       }
+    }
+  }
+
+  private async deleteSecurityGroup(
+    ec2Client: EC2Client,
+    securityGroupId?: string | null,
+  ) {
+    if (!securityGroupId) {
+      return;
+    }
+
+    try {
+      await ec2Client.send(
+        new DeleteSecurityGroupCommand({
+          GroupId: securityGroupId,
+        }),
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'name' in error &&
+        (error.name === 'InvalidGroup.NotFound' ||
+          error.name === 'DependencyViolation')
+      ) {
+        return;
+      }
+
+      throw error;
     }
   }
 

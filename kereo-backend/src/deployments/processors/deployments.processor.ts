@@ -77,7 +77,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       const ecsClusterName = process.env.ECS_CLUSTER_NAME;
       const ecsTaskExecutionRoleArn = process.env.ECS_TASK_EXECUTION_ROLE_ARN;
       const ecsSubnetIds = process.env.ECS_SUBNET_IDS;
-      const ecsSecurityGroupId = process.env.ECS_SECURITY_GROUP_ID;
+      const fallbackEcsSecurityGroupId = process.env.ECS_SECURITY_GROUP_ID;
       const jwtSecretParamArn = this.getRequiredJwtSecretParamArn();
       const coreDatabaseUrl = this.getRequiredCoreDatabaseUrl();
 
@@ -100,7 +100,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         ['ECS_CLUSTER_NAME', ecsClusterName],
         ['ECS_TASK_EXECUTION_ROLE_ARN', ecsTaskExecutionRoleArn],
         ['ECS_SUBNET_IDS', ecsSubnetIds],
-        ['ECS_SECURITY_GROUP_ID', ecsSecurityGroupId],
+        ['ECS_SECURITY_GROUP_ID', fallbackEcsSecurityGroupId],
         ['JWT_SECRET_PARAM_ARN', jwtSecretParamArn],
       ]
         .filter(([, value]) => !value)
@@ -122,7 +122,9 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         .split(',')
         .map((subnetId) => subnetId.trim())
         .filter(Boolean);
-      const resolvedEcsSecurityGroupIds = (ecsSecurityGroupId as string)
+      const resolvedEcsSecurityGroupIds = (
+        deployment.project.ecsSecurityGroupId ?? fallbackEcsSecurityGroupId
+      )
         .split(',')
         .map((securityGroupId) => securityGroupId.trim())
         .filter(Boolean);
