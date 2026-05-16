@@ -1,9 +1,7 @@
 import React, {
   createContext,
-  useContext,
   useState,
   useCallback,
-  useEffect,
 } from 'react';
 import { authApi, type AuthUser } from '../lib/api';
 
@@ -18,33 +16,46 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+function readStoredAuth() {
+  const storedToken = localStorage.getItem('kereo_token');
+  const storedUser = localStorage.getItem('kereo_user');
 
-  useEffect(() => {
-    const storedToken = localStorage.getItem('kereo_token');
-    const storedUser = localStorage.getItem('kereo_user');
-    if (storedToken && storedUser) {
-      try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch {
-        localStorage.removeItem('kereo_token');
-        localStorage.removeItem('kereo_user');
-      }
-    }
-    setIsLoading(false);
-  }, []);
+  if (!storedToken || !storedUser) {
+    return {
+      token: null,
+      user: null,
+    };
+  }
+
+  try {
+    return {
+      token: storedToken,
+      user: JSON.parse(storedUser) as AuthUser,
+    };
+  } catch {
+    localStorage.removeItem('kereo_token');
+    localStorage.removeItem('kereo_user');
+
+    return {
+      token: null,
+      user: null,
+    };
+  }
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [authState, setAuthState] = useState(readStoredAuth);
+  const [isLoading] = useState(false);
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
     const { accessToken, user: authUser } = res.data;
     localStorage.setItem('kereo_token', accessToken);
     localStorage.setItem('kereo_user', JSON.stringify(authUser));
-    setToken(accessToken);
-    setUser(authUser);
+    setAuthState({
+      token: accessToken,
+      user: authUser,
+    });
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
@@ -55,19 +66,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     localStorage.removeItem('kereo_token');
     localStorage.removeItem('kereo_user');
-    setToken(null);
-    setUser(null);
+    setAuthState({
+      token: null,
+      user: null,
+    });
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user: authState.user, token: authState.token, isLoading, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
-  return ctx;
-}
+export { AuthContext };

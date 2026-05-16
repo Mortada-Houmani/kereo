@@ -34,7 +34,31 @@ export function ProjectsPage() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+
+    projectsApi.list()
+      .then((res) => {
+        if (!cancelled) {
+          setProjects(res.data);
+          setError('');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Failed to load projects');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleDeploy(projectId: string, e: React.MouseEvent) {
     e.preventDefault();

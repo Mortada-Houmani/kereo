@@ -1,10 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { type NextFunction, type Request, type Response } from 'express';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
   });
 
@@ -12,7 +14,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
 
-  expressApp.use((req, res, next) => {
+  expressApp.use((req: Request, res: Response, next: NextFunction) => {
     const origin = req.headers.origin ?? '*';
 
     res.header('Access-Control-Allow-Origin', origin);
@@ -21,10 +23,7 @@ async function bootstrap() {
       'Access-Control-Allow-Methods',
       'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     );
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Authorization',
-    );
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
       return res.sendStatus(204);
@@ -42,4 +41,5 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
 }
-bootstrap();
+
+void bootstrap();

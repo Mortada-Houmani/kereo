@@ -19,15 +19,27 @@ interface Props {
 export function DeploymentDetailPanel({ dep }: Props) {
   const [detail, setDetail] = useState<DeploymentDetail | null>(null);
   const [logsOpen, setLogsOpen] = useState(true);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(true);
 
   useEffect(() => {
-    setDetail(null);
-    setLoadingDetail(true);
+    let cancelled = false;
+
     deploymentsApi.get(dep.id)
-      .then(r => setDetail(r.data))
+      .then((r) => {
+        if (!cancelled) {
+          setDetail(r.data);
+        }
+      })
       .catch(() => null)
-      .finally(() => setLoadingDetail(false));
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingDetail(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [dep.id]);
 
   const currentPhaseStep = getPhaseMeta(dep.phase).step;

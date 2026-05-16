@@ -9,10 +9,7 @@ import {
   CodeBuildClient,
   StartBuildCommand,
 } from '@aws-sdk/client-codebuild';
-import {
-  PutParameterCommand,
-  SSMClient,
-} from '@aws-sdk/client-ssm';
+import { PutParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import {
   CreateServiceCommand,
   DescribeServicesCommand,
@@ -53,7 +50,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
     this.getRequiredJwtSecretParamArn();
   }
 
-  async process(job: Job) {
+  async process(job: Job<{ deploymentId: string }>) {
     console.log('Processing deployment job:', job.id, job.data);
 
     const { deploymentId } = job.data;
@@ -129,8 +126,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         .split(',')
         .map((securityGroupId) => securityGroupId.trim())
         .filter(Boolean);
-      const resolvedJwtSecretParamArn = jwtSecretParamArn as string;
-      const resolvedCoreDatabaseUrl = coreDatabaseUrl as string;
+      const resolvedJwtSecretParamArn = jwtSecretParamArn;
+      const resolvedCoreDatabaseUrl = coreDatabaseUrl;
 
       if (
         resolvedEcsSubnetIds.length === 0 ||
@@ -163,12 +160,16 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
       const ecrRegistry = `${resolvedAwsAccountId}.dkr.ecr.${resolvedAwsRegion}.amazonaws.com`;
       const ecrImageTag = `${ecrRegistry}/${resolvedEcrRepository}:${deployment.id}`;
-      const codebuildClient = new CodeBuildClient({ region: resolvedAwsRegion });
+      const codebuildClient = new CodeBuildClient({
+        region: resolvedAwsRegion,
+      });
       const ecsClient = new ECSClient({ region: resolvedAwsRegion });
-      const logsClient = new CloudWatchLogsClient({ region: resolvedAwsRegion });
+      const logsClient = new CloudWatchLogsClient({
+        region: resolvedAwsRegion,
+      });
       const ssmClient = new SSMClient({ region: resolvedAwsRegion });
       const projectDatabaseName = this.buildProjectDatabaseName(
-        projectSlug as string,
+        projectSlug,
         deployment.project.id,
       );
       const projectDatabaseUrl = this.buildProjectDatabaseUrl(
@@ -270,7 +271,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
       deployment.commitSha =
         completedBuild.resolvedSourceVersion ?? deployment.commitSha;
-      deployment.codebuildBuildId = completedBuild.id ?? deployment.codebuildBuildId;
+      deployment.codebuildBuildId =
+        completedBuild.id ?? deployment.codebuildBuildId;
       deployment.codebuildStatus = completedBuild.buildStatus ?? 'SUCCEEDED';
       deployment.imageUrl = ecrImageTag;
       await this.deploymentsRepository.save(deployment);
@@ -343,9 +345,9 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       );
 
       const taskDefinitionArn = await this.registerTaskDefinition(ecsClient, {
-        family: projectEcsTaskFamily as string,
+        family: projectEcsTaskFamily,
         executionRoleArn: resolvedEcsTaskExecutionRoleArn,
-        containerName: projectSlug as string,
+        containerName: projectSlug,
         image: ecrImageTag,
         port,
         databaseUrlParamArn: projectDatabaseParamArn,
@@ -362,7 +364,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
       const serviceExists = await this.ecsServiceExists(ecsClient, {
         cluster: resolvedEcsClusterName,
-        serviceName: projectEcsServiceName as string,
+        serviceName: projectEcsServiceName,
       });
 
       if (serviceExists) {
@@ -373,7 +375,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
         await this.updateEcsService(ecsClient, {
           cluster: resolvedEcsClusterName,
-          serviceName: projectEcsServiceName as string,
+          serviceName: projectEcsServiceName,
           taskDefinitionArn,
         });
       } else {
@@ -384,12 +386,12 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
         await this.createEcsService(ecsClient, {
           cluster: resolvedEcsClusterName,
-          serviceName: projectEcsServiceName as string,
+          serviceName: projectEcsServiceName,
           taskDefinitionArn,
           subnetIds: resolvedEcsSubnetIds,
           securityGroupIds: resolvedEcsSecurityGroupIds,
-          targetGroupArn: projectTargetGroupArn as string,
-          containerName: projectSlug as string,
+          targetGroupArn: projectTargetGroupArn,
+          containerName: projectSlug,
           containerPort: port,
         });
       }
@@ -414,14 +416,14 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
           },
           {
             cluster: resolvedEcsClusterName,
-            services: [projectEcsServiceName as string],
+            services: [projectEcsServiceName],
           },
         );
       } catch (error) {
         const serviceDetails = await ecsClient.send(
           new DescribeServicesCommand({
             cluster: resolvedEcsClusterName,
-            services: [projectEcsServiceName as string],
+            services: [projectEcsServiceName],
           }),
         );
 
@@ -529,9 +531,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
 
   private getRequiredJwtSecretParamArn() {
     const jwtSecretParamArn = process.env.JWT_SECRET_PARAM_ARN;
-    const missingVariables = [
-      ['JWT_SECRET_PARAM_ARN', jwtSecretParamArn],
-    ]
+    const missingVariables = [['JWT_SECRET_PARAM_ARN', jwtSecretParamArn]]
       .filter(([, value]) => !value)
       .map(([name]) => name);
 
@@ -545,7 +545,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
   }
 
   private getRequiredCoreDatabaseUrl() {
-    const databaseUrl = process.env.DATABASE_URL || process.env.APP_DATABASE_URL;
+    const databaseUrl =
+      process.env.DATABASE_URL || process.env.APP_DATABASE_URL;
 
     if (!databaseUrl) {
       throw new Error(
@@ -564,13 +565,19 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       .replace(/_+/g, '_');
     const fallbackSlug = normalizedSlug || 'app';
     const projectSuffix = projectId.replace(/-/g, '').slice(0, 8);
-    const maxSlugLength = Math.max(1, 63 - 'app__'.length - projectSuffix.length);
+    const maxSlugLength = Math.max(
+      1,
+      63 - 'app__'.length - projectSuffix.length,
+    );
     const truncatedSlug = fallbackSlug.slice(0, maxSlugLength);
 
     return `app_${truncatedSlug}_${projectSuffix}`;
   }
 
-  private buildProjectDatabaseUrl(coreDatabaseUrl: string, databaseName: string) {
+  private buildProjectDatabaseUrl(
+    coreDatabaseUrl: string,
+    databaseName: string,
+  ) {
     const databaseUrl = new URL(coreDatabaseUrl);
     databaseUrl.pathname = `/${databaseName}`;
 
@@ -738,7 +745,11 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         environmentVariablesOverride: [
           { name: 'REPO_URL', value: input.repoUrl, type: 'PLAINTEXT' },
           { name: 'REPO_BRANCH', value: input.branch, type: 'PLAINTEXT' },
-          { name: 'BUILD_CONTEXT', value: input.buildContext, type: 'PLAINTEXT' },
+          {
+            name: 'BUILD_CONTEXT',
+            value: input.buildContext,
+            type: 'PLAINTEXT',
+          },
           {
             name: 'DOCKERFILE_PATH',
             value: input.dockerfilePath,
@@ -814,7 +825,9 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         const phaseSummary = phases
           .filter((phase) => phase.phaseStatus)
           .map((phase) => {
-            const context = phase.contexts?.map((item) => item.message).join('; ');
+            const context = phase.contexts
+              ?.map((item) => item.message)
+              .join('; ');
             return `- ${phase.phaseType}: ${phase.phaseStatus}${context ? ` (${context})` : ''}`;
           })
           .join('\n');
@@ -844,10 +857,13 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       BUILD: 'Building image',
       POST_BUILD: 'Pushing image',
       UPLOAD_ARTIFACTS: 'Finalizing build artifacts',
-      COMPLETED: currentStatus === 'SUCCEEDED' ? 'Build complete' : 'Finishing build',
+      COMPLETED:
+        currentStatus === 'SUCCEEDED' ? 'Build complete' : 'Finishing build',
     };
 
-    return phaseLabelMap[currentPhase] ?? `CodeBuild ${currentPhase.toLowerCase()}`;
+    return (
+      phaseLabelMap[currentPhase] ?? `CodeBuild ${currentPhase.toLowerCase()}`
+    );
   }
 
   private async registerTaskDefinition(

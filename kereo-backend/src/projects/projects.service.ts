@@ -10,10 +10,7 @@ import {
   CloudWatchLogsClient,
   DeleteLogGroupCommand,
 } from '@aws-sdk/client-cloudwatch-logs';
-import {
-  DeleteParameterCommand,
-  SSMClient,
-} from '@aws-sdk/client-ssm';
+import { DeleteParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { Client } from 'pg';
 
 import { Project } from './entities/project.entity';
@@ -111,17 +108,21 @@ export class ProjectsService {
   }
 
   findAll(userId: string) {
-    return this.projectsRepository.find({
-      where: {
-        user: {
-          id: userId,
+    return this.projectsRepository
+      .find({
+        where: {
+          user: {
+            id: userId,
+          },
         },
-      },
-      relations: ['deployments'],
-      order: {
-        createdAt: 'DESC',
-      },
-    }).then((projects) => projects.map((project) => this.toProjectDashboard(project)));
+        relations: ['deployments'],
+        order: {
+          createdAt: 'DESC',
+        },
+      })
+      .then((projects) =>
+        projects.map((project) => this.toProjectDashboard(project)),
+      );
   }
 
   async findOne(id: string, userId: string) {
@@ -212,17 +213,23 @@ export class ProjectsService {
 
   private async deleteProjectDataResources(project: Project) {
     const awsRegion = process.env.AWS_REGION;
-    const coreDatabaseUrl = process.env.DATABASE_URL || process.env.APP_DATABASE_URL;
+    const coreDatabaseUrl =
+      process.env.DATABASE_URL || process.env.APP_DATABASE_URL;
 
     if (!awsRegion) {
       throw new Error('Missing AWS_REGION environment variable');
     }
 
     if (!coreDatabaseUrl) {
-      throw new Error('Missing DATABASE_URL environment variable (or APP_DATABASE_URL)');
+      throw new Error(
+        'Missing DATABASE_URL environment variable (or APP_DATABASE_URL)',
+      );
     }
 
-    const databaseName = this.buildProjectDatabaseName(project.slug, project.id);
+    const databaseName = this.buildProjectDatabaseName(
+      project.slug,
+      project.id,
+    );
     const parameterName = this.buildProjectDatabaseParamName(project.id);
     const logGroupName = `/ecs/${project.slug}`;
 
@@ -239,7 +246,10 @@ export class ProjectsService {
       .replace(/_+/g, '_');
     const fallbackSlug = normalizedSlug || 'app';
     const projectSuffix = projectId.replace(/-/g, '').slice(0, 8);
-    const maxSlugLength = Math.max(1, 63 - 'app__'.length - projectSuffix.length);
+    const maxSlugLength = Math.max(
+      1,
+      63 - 'app__'.length - projectSuffix.length,
+    );
     const truncatedSlug = fallbackSlug.slice(0, maxSlugLength);
 
     return `app_${truncatedSlug}_${projectSuffix}`;
@@ -307,10 +317,7 @@ export class ProjectsService {
     }
   }
 
-  private async deleteProjectLogGroup(
-    awsRegion: string,
-    logGroupName: string,
-  ) {
+  private async deleteProjectLogGroup(awsRegion: string, logGroupName: string) {
     const logsClient = new CloudWatchLogsClient({ region: awsRegion });
 
     try {
@@ -363,7 +370,8 @@ export class ProjectsService {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map((deployment) => this.toDeploymentSummary(deployment));
 
-    const { deployments: _deployments, ...projectFields } = project;
+    const { deployments: projectDeployments, ...projectFields } = project;
+    void projectDeployments;
 
     return {
       ...projectFields,

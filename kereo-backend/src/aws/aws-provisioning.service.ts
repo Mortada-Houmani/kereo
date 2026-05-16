@@ -75,7 +75,7 @@ export class AwsProvisioningService implements OnModuleInit {
     }
 
     const client = new ElasticLoadBalancingV2Client({
-      region: awsRegion as string,
+      region: awsRegion,
     });
 
     const targetGroupName = this.buildTargetGroupName(input.slug);
@@ -91,7 +91,7 @@ export class AwsProvisioningService implements OnModuleInit {
           Protocol: 'HTTP',
           Port: input.port,
           TargetType: 'ip',
-          VpcId: vpcId as string,
+          VpcId: vpcId,
           HealthCheckPath: '/api/health',
           HealthCheckProtocol: 'HTTP',
           Matcher: {

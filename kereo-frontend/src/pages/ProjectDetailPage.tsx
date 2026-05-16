@@ -16,7 +16,7 @@ export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(id));
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [deploying, setDeploying] = useState(false);
@@ -46,7 +46,38 @@ export function ProjectDetailPage() {
     }
   }, [id]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (!id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    projectsApi.get(id)
+      .then((res) => {
+        if (cancelled) {
+          return;
+        }
+
+        setProject(res.data);
+        setSelectedDep(res.data.deployments[0] ?? null);
+        setError('');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Project not found');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   // Auto-refresh while active deployment
   useEffect(() => {
