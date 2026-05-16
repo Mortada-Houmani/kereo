@@ -9,6 +9,7 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap() {
     await this.ensureDeploymentDashboardColumns();
+    await this.ensureProjectRuntimeColumns();
   }
 
   private async ensureDeploymentDashboardColumns() {
@@ -23,5 +24,21 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     `);
 
     this.logger.log('Deployment dashboard schema is ready');
+  }
+
+  private async ensureProjectRuntimeColumns() {
+    await this.dataSource.query(`
+      ALTER TABLE projects
+        ADD COLUMN IF NOT EXISTS "runtimeType" varchar NOT NULL DEFAULT 'web-server',
+        ADD COLUMN IF NOT EXISTS "healthCheckPath" varchar NOT NULL DEFAULT '/'
+    `);
+
+    await this.dataSource.query(`
+      UPDATE projects
+      SET "runtimeType" = COALESCE(NULLIF("runtimeType", ''), 'web-server'),
+          "healthCheckPath" = COALESCE(NULLIF("healthCheckPath", ''), '/')
+    `);
+
+    this.logger.log('Project runtime schema is ready');
   }
 }

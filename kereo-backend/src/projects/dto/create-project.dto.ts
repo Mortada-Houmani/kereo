@@ -1,4 +1,13 @@
-import { IsInt, IsOptional, IsString, IsUrl, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Matches,
+  Min,
+} from 'class-validator';
+import { ProjectRuntimeType } from '../entities/project.entity';
 
 export class CreateProjectDto {
   @IsString()
@@ -19,6 +28,18 @@ export class CreateProjectDto {
   @IsInt()
   @Min(1)
   port?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(Object.values(ProjectRuntimeType))
+  runtimeType?: ProjectRuntimeType;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\//, {
+    message: 'healthCheckPath must start with "/"',
+  })
+  healthCheckPath?: string;
 
   @IsOptional()
   @IsString()

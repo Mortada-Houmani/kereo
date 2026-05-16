@@ -10,6 +10,11 @@ import {
 import { User } from '../../users/entities/user.entity';
 import { Deployment } from '../../deployments/entities/deployment.entity';
 
+export enum ProjectRuntimeType {
+  WEB_SERVER = 'web-server',
+  STATIC_SITE = 'static-site',
+}
+
 @Entity('projects')
 export class Project {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +37,15 @@ export class Project {
 
   @Column({ default: 3000 })
   port: number;
+
+  @Column({
+    type: 'varchar',
+    default: ProjectRuntimeType.WEB_SERVER,
+  })
+  runtimeType: ProjectRuntimeType;
+
+  @Column({ default: '/' })
+  healthCheckPath: string;
 
   @Column({ nullable: true })
   slug: string;

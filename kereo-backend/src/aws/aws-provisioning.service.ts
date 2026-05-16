@@ -18,6 +18,7 @@ import {
 type ProvisionProjectInput = {
   slug: string;
   port: number;
+  healthCheckPath: string;
 };
 
 type ProvisionProjectResult = {
@@ -92,7 +93,7 @@ export class AwsProvisioningService implements OnModuleInit {
           Port: input.port,
           TargetType: 'ip',
           VpcId: vpcId,
-          HealthCheckPath: '/api/health',
+          HealthCheckPath: input.healthCheckPath,
           HealthCheckProtocol: 'HTTP',
           Matcher: {
             HttpCode: '200',

@@ -7,6 +7,27 @@ Deployment platform monorepo.
 - `kereo-backend`: NestJS API and deployment control plane
 - `kereo-frontend`: Vite dashboard served as a static container on ECS
 
+## Project Runtime Types
+
+Kereo supports two Dockerized project runtime presets:
+
+- `web-server`
+  - for containers that run their own web server process
+  - default port: `3000`
+  - default health check path: `/`
+- `static-site`
+  - for containers that serve built files through nginx or another static web server
+  - default port: `80`
+  - default health check path: `/`
+
+This is infrastructure-level support only. Kereo will provision the right target-group defaults, but static SPA frameworks may still need their own base-path configuration when hosted under:
+
+```text
+/apps/<slug>
+```
+
+For example, Vite/React SPAs may need their framework `base` value set explicitly for subpath hosting.
+
 ## Production URLs
 
 - Frontend: `https://kereo.online/`

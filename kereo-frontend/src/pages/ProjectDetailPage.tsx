@@ -4,6 +4,7 @@ import {
   ArrowLeft, ExternalLink, RefreshCw, Trash2,
   Server, Database, Globe, GitBranch, GitCommit,
   AlertTriangle, Zap,
+  HeartPulse,
 } from 'lucide-react';
 import { projectsApi, deploymentsApi, type Project, type DeploymentSummary } from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -209,6 +210,16 @@ export function ProjectDetailPage() {
               <span className="detail-tile-value mono">{project.ecsServiceName}</span>
             </div>
           )}
+          <div className="detail-info-tile">
+            <span className="detail-tile-label"><Server size={11} /> Runtime</span>
+            <span className="detail-tile-value">
+              {project.runtimeType === 'static-site' ? 'Static site' : 'App server'}
+            </span>
+          </div>
+          <div className="detail-info-tile">
+            <span className="detail-tile-label"><HeartPulse size={11} /> Health check</span>
+            <span className="detail-tile-value mono">{project.healthCheckPath}</span>
+          </div>
           {latestDep?.databaseName && (
             <div className="detail-info-tile">
               <span className="detail-tile-label"><Database size={11} /> Database</span>

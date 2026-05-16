@@ -14,6 +14,7 @@ import { DeleteParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { Client } from 'pg';
 
 import { Project } from './entities/project.entity';
+import { ProjectRuntimeType } from './entities/project.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { AwsProvisioningService } from '../aws/aws-provisioning.service';
 import {
@@ -58,11 +59,20 @@ export class ProjectsService {
   ) {}
 
   async create(createProjectDto: CreateProjectDto, userId: string) {
+    const runtimeType =
+      createProjectDto.runtimeType ?? ProjectRuntimeType.WEB_SERVER;
+    const healthCheckPath = createProjectDto.healthCheckPath ?? '/';
+    const port =
+      createProjectDto.port ??
+      (runtimeType === ProjectRuntimeType.STATIC_SITE ? 80 : 3000);
     const slug = await this.generateUniqueSlug(createProjectDto.name);
     const resourceName = this.buildProjectResourceName(slug);
 
     const project = this.projectsRepository.create({
       ...createProjectDto,
+      runtimeType,
+      healthCheckPath,
+      port,
       slug,
       ecsServiceName: `${resourceName}-service`,
       ecsTaskFamily: resourceName,
@@ -78,6 +88,7 @@ export class ProjectsService {
         await this.awsProvisioningService.provisionProject({
           slug,
           port: savedProject.port,
+          healthCheckPath: savedProject.healthCheckPath,
         });
 
       savedProject.targetGroupArn = provisioningResult.targetGroupArn;

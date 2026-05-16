@@ -1,6 +1,19 @@
 import { useState } from 'react';
-import { X, Loader2, GitBranch, Terminal, Globe, Server, AlertTriangle } from 'lucide-react';
-import { projectsApi, type CreateProjectDto } from '../lib/api';
+import {
+  X,
+  Loader2,
+  GitBranch,
+  Terminal,
+  Globe,
+  Server,
+  AlertTriangle,
+  Activity,
+} from 'lucide-react';
+import {
+  projectsApi,
+  type CreateProjectDto,
+  type ProjectRuntimeType,
+} from '../lib/api';
 import './CreateProjectModal.css';
 
 interface Props {
@@ -15,6 +28,13 @@ const defaults: CreateProjectDto = {
   dockerfilePath: 'Dockerfile',
   buildContext: '.',
   port: 3000,
+  runtimeType: 'web-server',
+  healthCheckPath: '/',
+};
+
+const runtimeDefaults: Record<ProjectRuntimeType, number> = {
+  'web-server': 3000,
+  'static-site': 80,
 };
 
 export function CreateProjectModal({ onClose, onCreated }: Props) {
@@ -22,8 +42,27 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  function set(key: keyof CreateProjectDto, value: string | number) {
+  function set(
+    key: keyof CreateProjectDto,
+    value: string | number | ProjectRuntimeType,
+  ) {
     setForm(f => ({ ...f, [key]: value }));
+  }
+
+  function setRuntimeType(runtimeType: ProjectRuntimeType) {
+    setForm((current) => {
+      const nextPort =
+        current.port === undefined ||
+        current.port === runtimeDefaults[current.runtimeType ?? 'web-server']
+          ? runtimeDefaults[runtimeType]
+          : current.port;
+
+      return {
+        ...current,
+        runtimeType,
+        port: nextPort,
+      };
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -132,7 +171,40 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     placeholder="3000"
                     disabled={loading}
                   />
-                  <span className="field-hint">Traffic is routed here.</span>
+                  <span className="field-hint">
+                    {form.runtimeType === 'static-site'
+                      ? 'Static-site containers usually listen on port 80.'
+                      : 'Traffic is routed to the port your server listens on.'}
+                  </span>
+                </div>
+
+                <div className="field">
+                  <label className="label">Runtime Type</label>
+                  <div className="runtime-toggle" role="tablist" aria-label="Project runtime">
+                    <button
+                      type="button"
+                      className={`runtime-option ${form.runtimeType === 'web-server' ? 'runtime-option--active' : ''}`}
+                      onClick={() => setRuntimeType('web-server')}
+                      disabled={loading}
+                    >
+                      <Server size={13} strokeWidth={2} />
+                      <span>App server</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`runtime-option ${form.runtimeType === 'static-site' ? 'runtime-option--active' : ''}`}
+                      onClick={() => setRuntimeType('static-site')}
+                      disabled={loading}
+                    >
+                      <Globe size={13} strokeWidth={2} />
+                      <span>Static site</span>
+                    </button>
+                  </div>
+                  <span className="field-hint">
+                    {form.runtimeType === 'static-site'
+                      ? 'Use this for Dockerized sites served by nginx or another static web server.'
+                      : 'Use this for containers that run their own web server process.'}
+                  </span>
                 </div>
 
                 <div className="field">
@@ -149,7 +221,24 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                   />
                 </div>
 
-                <div className="field" style={{ gridColumn: 'span 2' }}>
+                <div className="field">
+                  <label className="label" htmlFor="proj-health-check">
+                    <Activity size={11} style={{ marginRight: 4 }} />
+                    Health Check Path
+                  </label>
+                  <input
+                    id="proj-health-check"
+                    value={form.healthCheckPath}
+                    onChange={e => set('healthCheckPath', e.target.value)}
+                    placeholder="/"
+                    disabled={loading}
+                  />
+                  <span className="field-hint">
+                    Kereo will use this ALB health check path for the project target group.
+                  </span>
+                </div>
+
+                <div className="field form-grid-span-2">
                   <label className="label" htmlFor="proj-context">Build Context</label>
                   <input
                     id="proj-context"
@@ -170,6 +259,16 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                 Initial setup takes about 20s.
               </p>
             </div>
+
+            {form.runtimeType === 'static-site' && (
+              <div className="modal-runtime-note fade-in">
+                <Globe size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                <p>
+                  Kereo will use static-site defaults for port and health checks, but SPA frameworks may
+                  still need their own base-path config for <span className="mono">/apps/&lt;slug&gt;</span> hosting.
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="field-error fade-in" style={{ marginTop: 12 }}>

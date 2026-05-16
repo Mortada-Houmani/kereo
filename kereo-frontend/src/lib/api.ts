@@ -69,6 +69,8 @@ export type DeploymentPhase =
   | 'live'
   | 'failed';
 
+export type ProjectRuntimeType = 'web-server' | 'static-site';
+
 export interface DeploymentSummary {
   id: string;
   status: DeploymentStatus;
@@ -97,6 +99,8 @@ export interface Project {
   dockerfilePath: string;
   buildContext: string;
   port: number;
+  runtimeType: ProjectRuntimeType;
+  healthCheckPath: string;
   slug: string | null;
   ecsServiceName: string | null;
   ecsTaskFamily: string | null;
@@ -116,6 +120,8 @@ export interface CreateProjectDto {
   dockerfilePath?: string;
   buildContext?: string;
   port?: number;
+  runtimeType?: ProjectRuntimeType;
+  healthCheckPath?: string;
 }
 
 export const projectsApi = {
