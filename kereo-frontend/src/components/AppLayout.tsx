@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { VerificationBanner } from './VerificationBanner';
 import './AppLayout.css';
 
 export function AppLayout() {
@@ -7,6 +8,7 @@ export function AppLayout() {
     <div className="app-shell">
       <Sidebar />
       <main className="app-main">
+        <VerificationBanner />
         <Outlet />
       </main>
     </div>

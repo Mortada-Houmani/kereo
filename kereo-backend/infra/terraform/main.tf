@@ -108,6 +108,26 @@ resource "aws_ssm_parameter" "github_app_private_key" {
   }
 }
 
+resource "aws_ssm_parameter" "github_client_secret" {
+  name  = "/${var.project_name}/prod/GITHUB_CLIENT_SECRET"
+  type  = "SecureString"
+  value = var.github_client_secret
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_ssm_parameter" "smtp_password" {
+  name  = "/${var.project_name}/prod/SMTP_PASSWORD"
+  type  = "SecureString"
+  value = var.smtp_password
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
 module "ecs_service" {
   source = "./modules/ecs-service"
 
@@ -123,6 +143,7 @@ module "ecs_service" {
   jwt_secret_param_arn             = aws_ssm_parameter.jwt_secret.arn
   github_webhook_secret_param_arn  = aws_ssm_parameter.github_webhook_secret.arn
   github_app_private_key_param_arn = aws_ssm_parameter.github_app_private_key.arn
+  github_client_secret_param_arn   = aws_ssm_parameter.github_client_secret.arn
 
   vpc_id                = module.network.vpc_id
   subnet_ids            = module.network.public_subnet_ids
@@ -141,10 +162,17 @@ module "ecs_service" {
   codebuild_project_name      = module.codebuild.project_name
   github_app_id               = var.github_app_id
   github_app_slug             = var.github_app_slug
+  github_client_id            = var.github_client_id
   redis_host                  = module.redis.host
   redis_port                  = module.redis.port
   log_group_name              = module.ecs.log_group_name
   typeorm_synchronize         = var.typeorm_synchronize
+  smtp_host                   = var.smtp_host
+  smtp_port                   = var.smtp_port
+  smtp_user                   = var.smtp_user
+  smtp_password_param_arn     = aws_ssm_parameter.smtp_password.arn
+  smtp_from_email             = var.smtp_from_email
+  smtp_from_name              = var.smtp_from_name
 
   container_port = 3000
   desired_count  = 1

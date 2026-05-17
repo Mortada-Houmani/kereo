@@ -46,6 +46,7 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
   const [loadingGithub, setLoadingGithub] = useState(true);
   const [error, setError] = useState('');
   const [installUrl, setInstallUrl] = useState<string | null>(null);
+  const [githubConnected, setGithubConnected] = useState(false);
   const [installations, setInstallations] = useState<GithubInstallation[]>([]);
   const [repositories, setRepositories] = useState<GithubRepository[]>([]);
   const [branches, setBranches] = useState<string[]>([]);
@@ -84,10 +85,18 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([githubApi.getAppInfo(), githubApi.listInstallations()])
-      .then(([appInfoRes, installationsRes]) => {
+    githubApi
+      .getConnection()
+      .then(async (connectionRes) => {
         if (cancelled) return;
-        setInstallUrl(appInfoRes.data.installUrl);
+        setInstallUrl(connectionRes.data.installUrl);
+        setGithubConnected(connectionRes.data.connected);
+        if (!connectionRes.data.connected || !connectionRes.data.isEmailVerified) {
+          setInstallations([]);
+          return;
+        }
+        const installationsRes = await githubApi.listInstallations();
+        if (cancelled) return;
         setInstallations(installationsRes.data);
         if (installationsRes.data.length === 1) {
           setForm((current) => ({
@@ -98,7 +107,7 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
       })
       .catch(() => {
         if (cancelled) return;
-        setError('Failed to load GitHub app repositories');
+        setError('Failed to load GitHub repositories');
       })
       .finally(() => {
         if (!cancelled) setLoadingGithub(false);
@@ -243,7 +252,17 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     ))}
                   </select>
                   <span className="field-hint">
-                    {installUrl ? (
+                    {!githubConnected ? (
+                      <>
+                        Connect GitHub from the Integrations tab first, then install the GitHub App.
+                        {' '}
+                        {installUrl ? (
+                          <a href={installUrl} target="_blank" rel="noreferrer">
+                            Open install page
+                          </a>
+                        ) : null}
+                      </>
+                    ) : installUrl ? (
                       <>
                         Need a repo here? Install the GitHub App in your account or org.
                         {' '}

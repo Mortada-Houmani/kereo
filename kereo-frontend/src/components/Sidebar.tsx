@@ -1,12 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutGrid, LogOut, ChevronRight,
+  LayoutGrid, LogOut, ChevronRight, PlugZap,
 } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import './Sidebar.css';
 
 const nav = [
   { to: '/', icon: LayoutGrid, label: 'Projects' },
+  { to: '/integrations', icon: PlugZap, label: 'Integrations' },
 ];
 
 export function Sidebar() {
@@ -35,7 +36,7 @@ export function Sidebar() {
       <div className="sidebar-footer">
         <div className="sidebar-user">
           <div className="sidebar-avatar">
-            {user?.email?.charAt(0).toUpperCase()}
+            {user?.githubLogin?.charAt(0).toUpperCase() ?? user?.email?.charAt(0).toUpperCase()}
           </div>
           <div className="sidebar-user-info">
             <span className="sidebar-user-email">{user?.email}</span>

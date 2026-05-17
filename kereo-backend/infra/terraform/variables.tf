@@ -86,6 +86,51 @@ variable "github_app_private_key" {
   }
 }
 
+variable "github_client_id" {
+  type = string
+
+  validation {
+    condition     = length(var.github_client_id) > 0
+    error_message = "github_client_id must be set before applying."
+  }
+}
+
+variable "github_client_secret" {
+  type      = string
+  sensitive = true
+
+  validation {
+    condition     = length(var.github_client_secret) > 0
+    error_message = "github_client_secret must be set before applying."
+  }
+}
+
+variable "smtp_host" {
+  type = string
+}
+
+variable "smtp_port" {
+  type = number
+}
+
+variable "smtp_user" {
+  type = string
+}
+
+variable "smtp_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "smtp_from_email" {
+  type = string
+}
+
+variable "smtp_from_name" {
+  type    = string
+  default = "Kereo"
+}
+
 variable "container_image" {
   type = string
 }

@@ -35,6 +35,9 @@ apiClient.interceptors.response.use(
 export interface AuthUser {
   id: string;
   email: string;
+  isEmailVerified: boolean;
+  githubLogin: string | null;
+  githubAvatarUrl: string | null;
 }
 
 export interface LoginResponse {
@@ -43,10 +46,20 @@ export interface LoginResponse {
 }
 
 export const authApi = {
-  register: (email: string, password: string) =>
-    apiClient.post<AuthUser>('/auth/register', { email, password }),
+  register: (email: string, password: string, confirmPassword: string) =>
+    apiClient.post<LoginResponse>('/auth/register', {
+      email,
+      password,
+      confirmPassword,
+    }),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>('/auth/login', { email, password }),
+  verifyEmail: (token: string) =>
+    apiClient.post<{ success: true }>('/auth/verify-email', { token }),
+  resendVerification: (email: string) =>
+    apiClient.post<{ success: true }>('/auth/resend-verification', { email }),
+  getGithubAuthUrl: () =>
+    apiClient.get<{ url: string }>('/auth/github/url'),
 };
 
 // ── Projects ──────────────────────────────────────────────────────────────────
@@ -156,6 +169,13 @@ export interface GithubAppInfo {
   installUrl: string | null;
 }
 
+export interface GithubConnectionInfo extends GithubAppInfo {
+  connected: boolean;
+  githubLogin: string | null;
+  githubAvatarUrl: string | null;
+  isEmailVerified: boolean;
+}
+
 export interface GithubInstallation {
   id: string;
   accountLogin: string;
@@ -189,6 +209,7 @@ export const projectsApi = {
 
 export const githubApi = {
   getAppInfo: () => apiClient.get<GithubAppInfo>('/github/app'),
+  getConnection: () => apiClient.get<GithubConnectionInfo>('/github/connection'),
   listInstallations: () => apiClient.get<GithubInstallation[]>('/github/installations'),
   listRepositories: (installationId: string) =>
     apiClient.get<GithubRepository[]>(

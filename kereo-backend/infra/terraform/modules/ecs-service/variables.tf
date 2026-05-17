@@ -64,6 +64,10 @@ variable "github_app_private_key_param_arn" {
   type = string
 }
 
+variable "github_client_secret_param_arn" {
+  type = string
+}
+
 variable "alb_dns_name" {
   type = string
 }
@@ -112,6 +116,10 @@ variable "github_app_slug" {
   type = string
 }
 
+variable "github_client_id" {
+  type = string
+}
+
 variable "redis_host" {
   type = string
 }
@@ -127,4 +135,28 @@ variable "log_group_name" {
 variable "typeorm_synchronize" {
   type    = bool
   default = false
+}
+
+variable "smtp_host" {
+  type = string
+}
+
+variable "smtp_port" {
+  type = number
+}
+
+variable "smtp_user" {
+  type = string
+}
+
+variable "smtp_password_param_arn" {
+  type = string
+}
+
+variable "smtp_from_email" {
+  type = string
+}
+
+variable "smtp_from_name" {
+  type = string
 }

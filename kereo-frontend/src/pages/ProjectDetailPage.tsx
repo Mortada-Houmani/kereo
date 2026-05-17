@@ -42,6 +42,8 @@ export function ProjectDetailPage() {
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
   const [newEnvSecret, setNewEnvSecret] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showEnvModal, setShowEnvModal] = useState(false);
   const [projectForm, setProjectForm] = useState<UpdateProjectDto>({
     branch: '',
     dockerfilePath: '',
@@ -264,6 +266,14 @@ export function ProjectDetailPage() {
           </div>
 
           <div className="detail-header-actions">
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowEditModal(true)}>
+              <Settings2 size={13} strokeWidth={2} />
+              Edit Project Details
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowEnvModal(true)}>
+              <Plus size={13} strokeWidth={2} />
+              Add Env Var
+            </button>
             <button className="btn btn-icon" onClick={() => load(true)} title="Refresh" disabled={refreshing}>
               <RefreshCw size={14} strokeWidth={2} className={refreshing ? 'spin-anim' : ''} />
             </button>
@@ -347,15 +357,21 @@ export function ProjectDetailPage() {
         >
           <div>
             <div className="section-label" style={{ marginBottom: 6 }}>
-              <Settings2 size={12} /> Project Settings
+              <Shield size={12} /> Environment
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
-              GitHub binding, runtime config, and deploy environment in one place.
+              Runtime configuration for your deployed app.
             </div>
           </div>
-          {project.requiresRedeploy && (
-            <span className="badge badge-warn">Configuration changed. Redeploy required.</span>
-          )}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            {project.requiresRedeploy && (
+              <span className="badge badge-warn">Configuration changed. Redeploy required.</span>
+            )}
+            <button className="btn btn-primary btn-sm" type="button" onClick={() => setShowEnvModal(true)}>
+              <Plus size={12} strokeWidth={2} />
+              Add Env Var
+            </button>
+          </div>
         </div>
 
         {!project.deployConfigValid && (
@@ -365,185 +381,44 @@ export function ProjectDetailPage() {
           </div>
         )}
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
-          <label className="field">
-            <span className="label">Branch</span>
-            <input
-              value={projectForm.branch ?? ''}
-              onChange={(e) => setProjectForm((current) => ({ ...current, branch: e.target.value }))}
-            />
-          </label>
-          <label className="field">
-            <span className="label">Dockerfile</span>
-            <input
-              value={projectForm.dockerfilePath ?? ''}
-              onChange={(e) =>
-                setProjectForm((current) => ({
-                  ...current,
-                  dockerfilePath: e.target.value,
-                }))
-              }
-            />
-          </label>
-          <label className="field">
-            <span className="label">Build Context</span>
-            <input
-              value={projectForm.buildContext ?? ''}
-              onChange={(e) =>
-                setProjectForm((current) => ({
-                  ...current,
-                  buildContext: e.target.value,
-                }))
-              }
-            />
-          </label>
-          <label className="field">
-            <span className="label">Port</span>
-            <input
-              type="number"
-              value={projectForm.port ?? 3000}
-              onChange={(e) =>
-                setProjectForm((current) => ({
-                  ...current,
-                  port: Number(e.target.value),
-                }))
-              }
-            />
-          </label>
-          <label className="field">
-            <span className="label">Runtime</span>
-            <select
-              value={projectForm.runtimeType ?? 'web-server'}
-              onChange={(e) =>
-                setProjectForm((current) => ({
-                  ...current,
-                  runtimeType: e.target.value as Project['runtimeType'],
-                }))
-              }
-            >
-              <option value="web-server">App server</option>
-              <option value="static-site">Static site</option>
-            </select>
-          </label>
-          <label className="field">
-            <span className="label">Health Check Path</span>
-            <input
-              value={projectForm.healthCheckPath ?? '/'}
-              onChange={(e) =>
-                setProjectForm((current) => ({
-                  ...current,
-                  healthCheckPath: e.target.value,
-                }))
-              }
-            />
-          </label>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            flexWrap: 'wrap',
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
-            Repo: <span className="mono">{project.githubRepositoryFullName ?? repoName(project.repoUrl)}</span>
-            {project.githubInstallationId ? (
-              <> · GitHub App installation <span className="mono">{project.githubInstallationId}</span></>
-            ) : null}
-          </div>
-          <button className="btn btn-primary btn-sm" onClick={handleSaveSettings} disabled={savingSettings}>
-            {savingSettings ? <span className="spinner" /> : <Save size={12} strokeWidth={2} />}
-            Save Settings
-          </button>
-        </div>
-
-        <div>
-          <div className="section-label" style={{ marginBottom: 10 }}>
-            <Shield size={12} /> Environment
-          </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns:
-                'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: 8,
-              alignItems: 'end',
-              marginBottom: 12,
-            }}
-          >
-            <label className="field">
-              <span className="label">Key</span>
-              <input value={newEnvKey} onChange={(e) => setNewEnvKey(e.target.value.toUpperCase())} />
-            </label>
-            <label className="field">
-              <span className="label">{newEnvSecret ? 'Secret value' : 'Value'}</span>
-              <input value={newEnvValue} onChange={(e) => setNewEnvValue(e.target.value)} />
-            </label>
-            <label className="field" style={{ justifyContent: 'center' }}>
-              <span className="label">Secret</span>
-              <input
-                type="checkbox"
-                checked={newEnvSecret}
-                onChange={(e) => setNewEnvSecret(e.target.checked)}
-                style={{ width: 18, height: 18 }}
-              />
-            </label>
-            <button className="btn btn-primary btn-sm" onClick={handleAddEnvVar} type="button">
-              <Plus size={12} strokeWidth={2} />
-              Add
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gap: 8 }}>
-            {project.envVars.length === 0 ? (
-              <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
-                No environment variables yet.
-              </div>
-            ) : (
-              project.envVars.map((envVar) => (
-                <div
-                  key={envVar.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border-primary)',
-                    borderRadius: 10,
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <div className="mono" style={{ fontWeight: 600 }}>
-                      {envVar.key}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>
-                      {envVar.isSecret ? 'Secret' : 'Plain env'} · updated {timeAgo(envVar.updatedAt)}
-                    </div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {project.envVars.length === 0 ? (
+            <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
+              No environment variables yet.
+            </div>
+          ) : (
+            project.envVars.map((envVar) => (
+              <div
+                key={envVar.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10,
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div className="mono" style={{ fontWeight: 600 }}>
+                    {envVar.key}
                   </div>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => handleRemoveEnvVar(envVar.id)}
-                    type="button"
-                  >
-                    <X size={12} strokeWidth={2} />
-                    Remove
-                  </button>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>
+                    {envVar.isSecret ? 'Secret' : 'Plain env'} · updated {timeAgo(envVar.updatedAt)}
+                  </div>
                 </div>
-              ))
-            )}
-          </div>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => handleRemoveEnvVar(envVar.id)}
+                  type="button"
+                >
+                  <X size={12} strokeWidth={2} />
+                  Remove
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
         {settingsMessage && (
@@ -686,6 +561,143 @@ export function ProjectDetailPage() {
               >
                 {deleting ? <span className="spinner" /> : <Trash2 size={12} strokeWidth={2} />}
                 {deleting ? 'Deleting…' : 'Delete project'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && (
+        <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) setShowEditModal(false); }}>
+          <div className="modal-panel scale-in">
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h2 className="modal-title">Edit Project Details</h2>
+                <p className="modal-subtitle">Update build, runtime, and health-check settings.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: 'grid', gap: 12 }}>
+              <label className="field">
+                <span className="label">Branch</span>
+                <input
+                  value={projectForm.branch ?? ''}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, branch: e.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span className="label">Dockerfile</span>
+                <input
+                  value={projectForm.dockerfilePath ?? ''}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, dockerfilePath: e.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span className="label">Build Context</span>
+                <input
+                  value={projectForm.buildContext ?? ''}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, buildContext: e.target.value }))}
+                />
+              </label>
+              <label className="field">
+                <span className="label">Port</span>
+                <input
+                  type="number"
+                  value={projectForm.port ?? 3000}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, port: Number(e.target.value) }))}
+                />
+              </label>
+              <label className="field">
+                <span className="label">Runtime</span>
+                <select
+                  value={projectForm.runtimeType ?? 'web-server'}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, runtimeType: e.target.value as Project['runtimeType'] }))}
+                >
+                  <option value="web-server">App server</option>
+                  <option value="static-site">Static site</option>
+                </select>
+              </label>
+              <label className="field">
+                <span className="label">Health Check Path</span>
+                <input
+                  value={projectForm.healthCheckPath ?? '/'}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, healthCheckPath: e.target.value }))}
+                />
+              </label>
+              <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
+                Repo: <span className="mono">{project.githubRepositoryFullName ?? repoName(project.repoUrl)}</span>
+                {project.githubInstallationId ? (
+                  <> · GitHub App installation <span className="mono">{project.githubInstallationId}</span></>
+                ) : null}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowEditModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  await handleSaveSettings();
+                  setShowEditModal(false);
+                }}
+                disabled={savingSettings}
+              >
+                {savingSettings ? <span className="spinner" /> : <Save size={12} strokeWidth={2} />}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEnvModal && (
+        <div className="modal-overlay" onClick={(event) => { if (event.target === event.currentTarget) setShowEnvModal(false); }}>
+          <div className="modal-panel scale-in">
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h2 className="modal-title">Add Environment Variable</h2>
+                <p className="modal-subtitle">Secrets stay masked after creation.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setShowEnvModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: 'grid', gap: 12 }}>
+              <label className="field">
+                <span className="label">Key</span>
+                <input value={newEnvKey} onChange={(e) => setNewEnvKey(e.target.value.toUpperCase())} />
+              </label>
+              <label className="field">
+                <span className="label">{newEnvSecret ? 'Secret value' : 'Value'}</span>
+                <input value={newEnvValue} onChange={(e) => setNewEnvValue(e.target.value)} />
+              </label>
+              <label className="field">
+                <span className="label">Secret</span>
+                <input
+                  type="checkbox"
+                  checked={newEnvSecret}
+                  onChange={(e) => setNewEnvSecret(e.target.checked)}
+                  style={{ width: 18, height: 18 }}
+                />
+              </label>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowEnvModal(false)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  await handleAddEnvVar();
+                  setShowEnvModal(false);
+                }}
+                type="button"
+              >
+                <Plus size={12} strokeWidth={2} />
+                Add
               </button>
             </div>
           </div>

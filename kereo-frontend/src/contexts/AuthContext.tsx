@@ -10,7 +10,12 @@ interface AuthContextValue {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    confirmPassword: string,
+  ) => Promise<void>;
+  setSession: (accessToken: string, user: AuthUser) => void;
   logout: () => void;
 }
 
@@ -47,9 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState(readStoredAuth);
   const [isLoading] = useState(false);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await authApi.login(email, password);
-    const { accessToken, user: authUser } = res.data;
+  const setSession = useCallback((accessToken: string, authUser: AuthUser) => {
     localStorage.setItem('kereo_token', accessToken);
     localStorage.setItem('kereo_user', JSON.stringify(authUser));
     setAuthState({
@@ -58,10 +61,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    await authApi.register(email, password);
-    await login(email, password);
-  }, [login]);
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await authApi.login(email, password);
+    const { accessToken, user: authUser } = res.data;
+    setSession(accessToken, authUser);
+  }, [setSession]);
+
+  const register = useCallback(
+    async (email: string, password: string, confirmPassword: string) => {
+      const res = await authApi.register(email, password, confirmPassword);
+      const { accessToken, user: authUser } = res.data;
+      setSession(accessToken, authUser);
+    },
+    [setSession],
+  );
 
   const logout = useCallback(() => {
     localStorage.removeItem('kereo_token');
@@ -73,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user: authState.user, token: authState.token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user: authState.user, token: authState.token, isLoading, login, register, setSession, logout }}>
       {children}
     </AuthContext.Provider>
   );

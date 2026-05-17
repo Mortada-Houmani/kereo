@@ -16,12 +16,14 @@ import type { AuthenticatedRequest } from '../auth/authenticated-request';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpsertProjectEnvVarDto } from './dto/upsert-project-env-var.dto';
+import { VerifiedEmailGuard } from '../auth/verified-email.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('projects')
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
 
+  @UseGuards(VerifiedEmailGuard)
   @Post()
   create(
     @Body() createProjectDto: CreateProjectDto,
@@ -40,6 +42,7 @@ export class ProjectsController {
     return this.projectsService.findOne(id, req.user.id);
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -54,6 +57,7 @@ export class ProjectsController {
     return this.projectsService.listEnvVars(id, req.user.id);
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Post(':id/env')
   upsertEnvVar(
     @Param('id') id: string,
@@ -63,6 +67,7 @@ export class ProjectsController {
     return this.projectsService.upsertEnvVar(id, req.user.id, envVarDto);
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Patch(':id/env/:envVarId')
   updateEnvVar(
     @Param('id') id: string,
@@ -78,6 +83,7 @@ export class ProjectsController {
     );
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Delete(':id/env/:envVarId')
   removeEnvVar(
     @Param('id') id: string,
@@ -87,6 +93,7 @@ export class ProjectsController {
     return this.projectsService.removeEnvVar(id, envVarId, req.user.id);
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.projectsService.remove(id, req.user.id);

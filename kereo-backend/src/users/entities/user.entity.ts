@@ -16,8 +16,29 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ select: false })
-  password: string;
+  @Column({ select: false, nullable: true })
+  password: string | null;
+
+  @Column({ default: false })
+  isEmailVerified: boolean;
+
+  @Column({ select: false, nullable: true })
+  emailVerificationTokenHash: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  emailVerificationExpiresAt: Date | null;
+
+  @Column({ type: 'varchar', unique: true, nullable: true })
+  githubUserId: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  githubLogin: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  githubAvatarUrl: string | null;
+
+  @Column({ type: 'text', select: false, nullable: true })
+  githubAccessToken: string | null;
 
   @OneToMany(() => Project, (project) => project.user)
   projects: Project[];

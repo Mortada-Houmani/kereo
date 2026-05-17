@@ -1,6 +1,8 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GithubService } from './github.service';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
+import { VerifiedEmailGuard } from '../auth/verified-email.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('github')
@@ -14,22 +16,41 @@ export class GithubController {
     };
   }
 
+  @Get('connection')
+  getCurrentConnection(@Req() req: AuthenticatedRequest) {
+    return this.githubService.getCurrentConnection(req.user);
+  }
+
+  @UseGuards(VerifiedEmailGuard)
   @Get('installations')
-  listInstallations() {
-    return this.githubService.listInstallations();
+  listInstallations(@Req() req: AuthenticatedRequest) {
+    return this.githubService.listInstallationsForUser(
+      req.user.githubAccessToken ?? '',
+    );
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Get('installations/:installationId/repositories')
-  listRepositories(@Param('installationId') installationId: string) {
-    return this.githubService.listRepositories(installationId);
+  listRepositories(
+    @Param('installationId') installationId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.githubService.listRepositoriesForUser(
+      req.user.githubAccessToken ?? '',
+      installationId,
+    );
   }
 
+  @UseGuards(VerifiedEmailGuard)
   @Get('installations/:installationId/repositories/:owner/:repo/branches')
   listBranches(
-    @Param('installationId') installationId: string,
     @Param('owner') owner: string,
     @Param('repo') repo: string,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.githubService.listBranches(installationId, `${owner}/${repo}`);
+    return this.githubService.listBranchesForUser(
+      req.user.githubAccessToken ?? '',
+      `${owner}/${repo}`,
+    );
   }
 }

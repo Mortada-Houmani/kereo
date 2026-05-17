@@ -9,6 +9,36 @@
   overflow-x: hidden;
 }
 
+.verification-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--yellow-dim);
+  background: rgba(240, 180, 41, 0.08);
+}
+
+.verification-banner-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--yellow);
+  font-size: .82rem;
+}
+
+.verification-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.verification-banner-message {
+  color: var(--text-secondary);
+  font-size: .78rem;
+}
+
 @media (max-width: 900px) {
   .app-shell {
     flex-direction: column;

@@ -7,10 +7,15 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { MailerModule } from '../mailer/mailer.module';
+import { GithubModule } from '../github/github.module';
+import { VerifiedEmailGuard } from './verified-email.guard';
 
 @Module({
   imports: [
     UsersModule,
+    MailerModule,
+    GithubModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -27,6 +32,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, VerifiedEmailGuard],
+  exports: [VerifiedEmailGuard],
 })
 export class AuthModule {}

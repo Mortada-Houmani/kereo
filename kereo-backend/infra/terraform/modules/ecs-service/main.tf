@@ -118,6 +118,10 @@ resource "aws_ecs_task_definition" "this" {
           value = var.github_app_slug
         },
         {
+          name  = "GITHUB_CLIENT_ID"
+          value = var.github_client_id
+        },
+        {
           name  = "ECS_SECURITY_GROUP_ID"
           value = aws_security_group.ecs_tasks.id
         },
@@ -148,6 +152,26 @@ resource "aws_ecs_task_definition" "this" {
         {
           name  = "PUBLIC_BASE_URL"
           value = var.public_base_url
+        },
+        {
+          name  = "SMTP_HOST"
+          value = var.smtp_host
+        },
+        {
+          name  = "SMTP_PORT"
+          value = tostring(var.smtp_port)
+        },
+        {
+          name  = "SMTP_USER"
+          value = var.smtp_user
+        },
+        {
+          name  = "SMTP_FROM_EMAIL"
+          value = var.smtp_from_email
+        },
+        {
+          name  = "SMTP_FROM_NAME"
+          value = var.smtp_from_name
         }
       ]
 
@@ -167,6 +191,14 @@ resource "aws_ecs_task_definition" "this" {
         {
           name      = "GITHUB_APP_PRIVATE_KEY"
           valueFrom = var.github_app_private_key_param_arn
+        },
+        {
+          name      = "GITHUB_CLIENT_SECRET"
+          valueFrom = var.github_client_secret_param_arn
+        },
+        {
+          name      = "SMTP_PASSWORD"
+          valueFrom = var.smtp_password_param_arn
         }
       ]
 

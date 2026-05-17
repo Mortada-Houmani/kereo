@@ -3,6 +3,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -26,6 +27,7 @@ import {
   DeploymentStatus,
 } from '../deployments/entities/deployment.entity';
 import { ProjectEnvVar } from './entities/project-env-var.entity';
+import { UsersService } from '../users/users.service';
 
 type DeploymentSummary = {
   id: string;
@@ -73,6 +75,7 @@ export class ProjectsService {
     private readonly projectEnvVarsRepository: Repository<ProjectEnvVar>,
     private readonly awsProvisioningService: AwsProvisioningService,
     private readonly githubService: GithubService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(createProjectDto: CreateProjectDto, userId: string) {
@@ -91,6 +94,7 @@ export class ProjectsService {
       repoBinding.githubInstallationId &&
       repoBinding.githubRepositoryFullName
     ) {
+      await this.assertUserCanAccessGithubBinding(userId, repoBinding);
       await this.githubService.verifyRepositoryAccess(
         repoBinding.githubInstallationId,
         repoBinding.githubRepositoryFullName,
@@ -186,6 +190,7 @@ export class ProjectsService {
       repoBinding.githubInstallationId &&
       repoBinding.githubRepositoryFullName
     ) {
+      await this.assertUserCanAccessGithubBinding(userId, repoBinding);
       await this.githubService.verifyRepositoryAccess(
         repoBinding.githubInstallationId,
         repoBinding.githubRepositoryFullName,
@@ -679,6 +684,45 @@ export class ProjectsService {
       githubDefaultBranch,
       repoUrl,
     };
+  }
+
+  private async assertUserCanAccessGithubBinding(
+    userId: string,
+    repoBinding: {
+      githubInstallationId: string | null;
+      githubRepositoryFullName: string | null;
+    },
+  ) {
+    if (
+      !repoBinding.githubInstallationId ||
+      !repoBinding.githubRepositoryFullName
+    ) {
+      return;
+    }
+
+    const user = await this.usersService.findById(userId);
+
+    if (!user?.githubAccessToken) {
+      throw new ForbiddenException(
+        'Connect GitHub before binding a repository to this project',
+      );
+    }
+
+    const repositories = await this.githubService.listRepositoriesForUser(
+      user.githubAccessToken,
+      repoBinding.githubInstallationId,
+    );
+    const canAccessRepository = repositories.some(
+      (repository) =>
+        repository.fullName.toLowerCase() ===
+        repoBinding.githubRepositoryFullName?.toLowerCase(),
+    );
+
+    if (!canAccessRepository) {
+      throw new ForbiddenException(
+        'You do not have access to the selected GitHub repository',
+      );
+    }
   }
 
   private toDeploymentSummary(deployment: Deployment): DeploymentSummary {

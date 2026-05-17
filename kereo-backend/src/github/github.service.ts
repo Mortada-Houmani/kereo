@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createPrivateKey, createSign } from 'crypto';
 
-type GitHubInstallation = {
+type GitHubUserInstallation = {
   id: number;
   account: {
     login: string;
@@ -21,6 +21,18 @@ type GitHubBranch = {
   name: string;
 };
 
+type GitHubUserProfile = {
+  id: number;
+  login: string;
+  avatar_url: string | null;
+};
+
+type GitHubUserEmail = {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+};
+
 @Injectable()
 export class GithubService {
   getInstallationUrl() {
@@ -32,20 +44,42 @@ export class GithubService {
     );
   }
 
-  async listInstallations() {
-    const installations =
-      await this.githubAppRequest<GitHubInstallation[]>('/app/installations');
+  getUserAuthUrl() {
+    const clientId = process.env.GITHUB_CLIENT_ID;
 
-    return installations.map((installation) => ({
+    if (!clientId) {
+      throw new InternalServerErrorException(
+        'Missing GitHub OAuth configuration: GITHUB_CLIENT_ID',
+      );
+    }
+
+    const redirectUri =
+      process.env.GITHUB_OAUTH_REDIRECT_URI ??
+      `${(process.env.PUBLIC_BASE_URL ?? '').replace(/\/+$/g, '')}/api/auth/github/callback`;
+
+    const url = new URL('https://github.com/login/oauth/authorize');
+    url.searchParams.set('client_id', clientId);
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('scope', 'read:user user:email');
+
+    return url.toString();
+  }
+
+  async listInstallationsForUser(accessToken: string) {
+    const installations = await this.userRequest<{
+      installations: GitHubUserInstallation[];
+    }>(accessToken, '/user/installations');
+
+    return installations.installations.map((installation) => ({
       id: String(installation.id),
       accountLogin: installation.account?.login ?? 'unknown',
     }));
   }
 
-  async listRepositories(installationId: string) {
-    const repositories = await this.installationRequest<{
+  async listRepositoriesForUser(accessToken: string, installationId: string) {
+    const repositories = await this.userRequest<{
       repositories: GitHubRepository[];
-    }>(installationId, '/installation/repositories');
+    }>(accessToken, `/user/installations/${installationId}/repositories`);
 
     return repositories.repositories.map((repository) => ({
       id: String(repository.id),
@@ -57,19 +91,47 @@ export class GithubService {
     }));
   }
 
-  async listBranches(installationId: string, fullName: string) {
+  async listBranchesForUser(accessToken: string, fullName: string) {
     const [owner, repo] = fullName.split('/');
 
     if (!owner || !repo) {
       throw new InternalServerErrorException('Invalid repository full name');
     }
 
-    const branches = await this.installationRequest<GitHubBranch[]>(
-      installationId,
+    const branches = await this.userRequest<GitHubBranch[]>(
+      accessToken,
       `/repos/${owner}/${repo}/branches`,
     );
 
     return branches.map((branch) => branch.name);
+  }
+
+  async authenticateUser(code: string) {
+    const accessToken = await this.exchangeGithubCode(code);
+    const profile = await this.userRequest<GitHubUserProfile>(
+      accessToken,
+      '/user',
+    );
+    const emails = await this.userRequest<GitHubUserEmail[]>(
+      accessToken,
+      '/user/emails',
+    );
+    const primaryEmail = emails.find((email) => email.primary) ?? emails[0];
+
+    if (!primaryEmail?.email) {
+      throw new InternalServerErrorException(
+        'GitHub account does not expose a usable email address',
+      );
+    }
+
+    return {
+      githubUserId: String(profile.id),
+      githubLogin: profile.login,
+      githubAvatarUrl: profile.avatar_url,
+      githubAccessToken: accessToken,
+      email: primaryEmail.email,
+      emailVerified: primaryEmail.verified,
+    };
   }
 
   async getInstallationToken(installationId: string) {
@@ -93,6 +155,20 @@ export class GithubService {
     await this.installationRequest(installationId, `/repos/${owner}/${repo}`);
   }
 
+  getCurrentConnection(input: {
+    githubLogin: string | null;
+    githubAvatarUrl: string | null;
+    isEmailVerified: boolean;
+  }) {
+    return {
+      installUrl: this.getInstallationUrl(),
+      connected: Boolean(input.githubLogin),
+      githubLogin: input.githubLogin,
+      githubAvatarUrl: input.githubAvatarUrl,
+      isEmailVerified: input.isEmailVerified,
+    };
+  }
+
   private async installationRequest<T>(
     installationId: string,
     path: string,
@@ -105,6 +181,28 @@ export class GithubService {
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
+        'User-Agent': 'kereo',
+        ...(init?.headers ?? {}),
+      },
+    });
+  }
+
+  private async userRequest<T>(
+    accessToken: string,
+    path: string,
+    init?: RequestInit,
+  ) {
+    if (!accessToken) {
+      throw new InternalServerErrorException(
+        'GitHub account is not connected for this user',
+      );
+    }
+
+    return this.githubRequest<T>(path, {
+      ...init,
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${accessToken}`,
         'User-Agent': 'kereo',
         ...(init?.headers ?? {}),
       },
@@ -136,6 +234,52 @@ export class GithubService {
     }
 
     return (await response.json()) as T;
+  }
+
+  private async exchangeGithubCode(code: string) {
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+    const redirectUri =
+      process.env.GITHUB_OAUTH_REDIRECT_URI ??
+      `${(process.env.PUBLIC_BASE_URL ?? '').replace(/\/+$/g, '')}/api/auth/github/callback`;
+
+    if (!clientId || !clientSecret) {
+      throw new InternalServerErrorException(
+        'Missing GitHub OAuth configuration',
+      );
+    }
+
+    const response = await fetch(
+      'https://github.com/login/oauth/access_token',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'kereo',
+        },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          redirect_uri: redirectUri,
+        }),
+      },
+    );
+
+    const body = (await response.json()) as {
+      access_token?: string;
+      error?: string;
+      error_description?: string;
+    };
+
+    if (!response.ok || !body.access_token) {
+      throw new InternalServerErrorException(
+        `GitHub OAuth exchange failed: ${body.error_description ?? body.error ?? 'unknown error'}`,
+      );
+    }
+
+    return body.access_token;
   }
 
   private createAppJwt() {

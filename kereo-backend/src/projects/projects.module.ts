@@ -6,15 +6,18 @@ import { ProjectsService } from './projects.service';
 import { ProjectsController } from './projects.controller';
 import { AwsModule } from '../aws/aws.module';
 import { GithubModule } from '../github/github.module';
+import { VerifiedEmailGuard } from '../auth/verified-email.guard';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Project, ProjectEnvVar]),
     AwsModule,
     GithubModule,
+    UsersModule,
   ],
   controllers: [ProjectsController],
-  providers: [ProjectsService],
+  providers: [ProjectsService, VerifiedEmailGuard],
   exports: [ProjectsService],
 })
 export class ProjectsModule {}

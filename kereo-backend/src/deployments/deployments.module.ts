@@ -7,6 +7,7 @@ import { DeploymentsController } from './deployments.controller';
 import { ProjectsModule } from '../projects/projects.module';
 import { BullModule } from '@nestjs/bullmq';
 import { GithubModule } from '../github/github.module';
+import { VerifiedEmailGuard } from '../auth/verified-email.guard';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { GithubModule } from '../github/github.module';
     GithubModule,
   ],
   controllers: [DeploymentsController],
-  providers: [DeploymentsService, DeploymentsProcessor],
+  providers: [DeploymentsService, DeploymentsProcessor, VerifiedEmailGuard],
   exports: [DeploymentsService],
 })
 export class DeploymentsModule {}

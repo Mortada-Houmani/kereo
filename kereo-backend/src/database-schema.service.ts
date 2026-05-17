@@ -12,6 +12,7 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     await this.ensureProjectRuntimeColumns();
     await this.ensureProjectGithubColumns();
     await this.ensureProjectEnvVarTable();
+    await this.ensureUserAuthColumns();
   }
 
   private async ensureDeploymentDashboardColumns() {
@@ -78,5 +79,31 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     `);
 
     this.logger.log('Project env var schema is ready');
+  }
+
+  private async ensureUserAuthColumns() {
+    await this.dataSource.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS "isEmailVerified" boolean NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS "emailVerificationTokenHash" varchar,
+        ADD COLUMN IF NOT EXISTS "emailVerificationExpiresAt" timestamptz,
+        ADD COLUMN IF NOT EXISTS "githubUserId" varchar,
+        ADD COLUMN IF NOT EXISTS "githubLogin" varchar,
+        ADD COLUMN IF NOT EXISTS "githubAvatarUrl" varchar,
+        ADD COLUMN IF NOT EXISTS "githubAccessToken" text
+    `);
+
+    await this.dataSource.query(`
+      ALTER TABLE users
+      ALTER COLUMN password DROP NOT NULL
+    `);
+
+    await this.dataSource.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS "IDX_users_githubUserId"
+      ON users ("githubUserId")
+      WHERE "githubUserId" IS NOT NULL
+    `);
+
+    this.logger.log('User auth schema is ready');
   }
 }
