@@ -8,6 +8,13 @@ type GitHubUserInstallation = {
   } | null;
 };
 
+type GitHubAppInstallation = {
+  id: number;
+  account: {
+    login: string;
+  } | null;
+};
+
 type GitHubRepository = {
   id: number;
   full_name: string;
@@ -25,6 +32,15 @@ type GitHubUserProfile = {
   id: number;
   login: string;
   avatar_url: string | null;
+};
+
+type GitHubUserRepo = {
+  id: number;
+  full_name: string;
+  default_branch: string;
+  private: boolean;
+  clone_url: string;
+  html_url: string;
 };
 
 type GitHubUserEmail = {
@@ -66,29 +82,62 @@ export class GithubService {
   }
 
   async listInstallationsForUser(accessToken: string) {
-    const installations = await this.userRequest<{
-      installations: GitHubUserInstallation[];
-    }>(accessToken, '/user/installations');
+    const [userRepos, installations] = await Promise.all([
+      this.listUserRepositories(accessToken),
+      this.listAppInstallations(),
+    ]);
+    const visibleRepos = new Set(
+      userRepos.map((repository) => repository.full_name.toLowerCase()),
+    );
+    const accessibleInstallations: GitHubUserInstallation[] = [];
 
-    return installations.installations.map((installation) => ({
+    for (const installation of installations) {
+      const installationRepositories = await this.installationRequest<{
+        repositories: GitHubRepository[];
+      }>(String(installation.id), '/installation/repositories?per_page=100');
+
+      if (
+        installationRepositories.repositories.some((repository) =>
+          visibleRepos.has(repository.full_name.toLowerCase()),
+        )
+      ) {
+        accessibleInstallations.push({
+          id: installation.id,
+          account: installation.account,
+        });
+      }
+    }
+
+    return accessibleInstallations.map((installation) => ({
       id: String(installation.id),
       accountLogin: installation.account?.login ?? 'unknown',
     }));
   }
 
   async listRepositoriesForUser(accessToken: string, installationId: string) {
-    const repositories = await this.userRequest<{
-      repositories: GitHubRepository[];
-    }>(accessToken, `/user/installations/${installationId}/repositories`);
+    const [userRepos, repositories] = await Promise.all([
+      this.listUserRepositories(accessToken),
+      this.installationRequest<{ repositories: GitHubRepository[] }>(
+        installationId,
+        '/installation/repositories?per_page=100',
+      ),
+    ]);
+    const visibleRepos = new Set(
+      userRepos.map((repository) => repository.full_name.toLowerCase()),
+    );
 
-    return repositories.repositories.map((repository) => ({
-      id: String(repository.id),
-      fullName: repository.full_name,
-      defaultBranch: repository.default_branch,
-      private: repository.private,
-      repoUrl: repository.clone_url,
-      htmlUrl: repository.html_url,
-    }));
+    return repositories.repositories
+      .filter((repository) =>
+        visibleRepos.has(repository.full_name.toLowerCase()),
+      )
+      .map((repository) => ({
+        id: String(repository.id),
+        fullName: repository.full_name,
+        defaultBranch: repository.default_branch,
+        private: repository.private,
+        repoUrl: repository.clone_url,
+        htmlUrl: repository.html_url,
+      }));
   }
 
   async listBranchesForUser(accessToken: string, fullName: string) {
@@ -132,6 +181,13 @@ export class GithubService {
       email: primaryEmail.email,
       emailVerified: primaryEmail.verified,
     };
+  }
+
+  async listUserRepositories(accessToken: string) {
+    return this.userRequest<GitHubUserRepo[]>(
+      accessToken,
+      '/user/repos?per_page=100&affiliation=owner,collaborator,organization_member',
+    );
   }
 
   async getInstallationToken(installationId: string) {
@@ -241,6 +297,12 @@ export class GithubService {
         ...(init?.headers ?? {}),
       },
     });
+  }
+
+  private async listAppInstallations() {
+    return this.githubAppRequest<GitHubAppInstallation[]>(
+      '/app/installations?per_page=100',
+    );
   }
 
   private async githubRequest<T>(path: string, init?: RequestInit) {
