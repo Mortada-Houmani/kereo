@@ -76,7 +76,7 @@ export class GithubService {
     const url = new URL('https://github.com/login/oauth/authorize');
     url.searchParams.set('client_id', clientId);
     url.searchParams.set('redirect_uri', redirectUri);
-    url.searchParams.set('scope', 'read:user user:email');
+    url.searchParams.set('scope', 'read:user user:email repo read:org');
 
     return url.toString();
   }
