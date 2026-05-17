@@ -21,6 +21,11 @@ export class GithubController {
     return this.githubService.getCurrentConnection(req.user);
   }
 
+  @Get('debug-me')
+  getDebugConnectionState(@Req() req: AuthenticatedRequest) {
+    return this.githubService.getDebugConnectionState(req.user);
+  }
+
   @UseGuards(VerifiedEmailGuard)
   @Get('installations')
   listInstallations(@Req() req: AuthenticatedRequest) {

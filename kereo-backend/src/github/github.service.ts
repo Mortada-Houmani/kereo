@@ -170,6 +170,25 @@ export class GithubService {
     };
   }
 
+  getDebugConnectionState(input: {
+    id: string;
+    email: string;
+    isEmailVerified: boolean;
+    githubLogin: string | null;
+    githubAvatarUrl: string | null;
+    githubAccessToken?: string | null;
+  }) {
+    return {
+      userId: input.id,
+      email: input.email,
+      isEmailVerified: input.isEmailVerified,
+      githubLogin: input.githubLogin,
+      githubAvatarUrl: input.githubAvatarUrl,
+      hasGithubAccessToken: Boolean(input.githubAccessToken),
+      githubAccessTokenLength: input.githubAccessToken?.length ?? 0,
+    };
+  }
+
   private async installationRequest<T>(
     installationId: string,
     path: string,
