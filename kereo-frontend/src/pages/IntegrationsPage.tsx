@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ExternalLink, GitBranch, RefreshCw } from 'lucide-react';
 import {
   authApi,
@@ -8,10 +9,24 @@ import {
 } from '../lib/api';
 
 export function IntegrationsPage() {
+  const [searchParams] = useSearchParams();
   const [connection, setConnection] = useState<GithubConnectionInfo | null>(null);
   const [installations, setInstallations] = useState<GithubInstallation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const needsAppSetup = searchParams.get('setup') === 'app';
+  const githubInstallationId = searchParams.get('installation_id');
+  const githubSetupAction = searchParams.get('setup_action');
+  const hasRepositoryAccess = installations.length > 0;
+  const returnedFromGithubInstall =
+    Boolean(githubInstallationId) &&
+    (githubSetupAction === 'install' || githubSetupAction === 'update');
+  const statusLabel = useMemo(() => {
+    if (!connection?.connected) return 'GitHub account not connected';
+    if (!connection.isEmailVerified) return 'Verify your email to continue';
+    if (!hasRepositoryAccess) return 'Repository access not granted yet';
+    return `Connected as ${connection.githubLogin}`;
+  }, [connection, hasRepositoryAccess]);
 
   useEffect(() => {
     void load();
@@ -69,7 +84,7 @@ export function IntegrationsPage() {
           {connection?.installUrl ? (
             <a className="btn btn-primary btn-sm" href={connection.installUrl} target="_blank" rel="noreferrer">
               <ExternalLink size={12} strokeWidth={2} />
-              Install GitHub App
+              Grant Repository Access
             </a>
           ) : null}
         </div>
@@ -78,13 +93,57 @@ export function IntegrationsPage() {
           <div className="projects-error">{error}</div>
         ) : (
           <>
-          <div style={{ color: 'var(--text-secondary)', fontSize: '.85rem' }}>
+            {returnedFromGithubInstall ? (
+              <div
+                style={{
+                  border: '1px solid color-mix(in srgb, var(--green) 35%, var(--border))',
+                  background: 'color-mix(in srgb, var(--green) 10%, transparent)',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  display: 'grid',
+                  gap: 6,
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>GitHub access updated</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                  GitHub sent you back after updating the Kereo app installation.
+                  {hasRepositoryAccess
+                    ? ' Your repositories are ready to use.'
+                    : ' If the repo list still looks empty, give it a quick refresh.'}
+                </div>
+              </div>
+            ) : null}
+
+            {needsAppSetup && connection?.connected && !hasRepositoryAccess ? (
+              <div
+                style={{
+                  border: '1px solid color-mix(in srgb, var(--accent) 40%, var(--border))',
+                  background: 'color-mix(in srgb, var(--accent) 9%, transparent)',
+                  borderRadius: 10,
+                  padding: '12px 14px',
+                  display: 'grid',
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>Finish GitHub setup</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '.82rem' }}>
+                  Your account is connected. The last step is granting the Kereo GitHub App
+                  access to the repositories you want to deploy.
+                </div>
+                {connection.installUrl ? (
+                  <div>
+                    <a className="btn btn-primary btn-sm" href={connection.installUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink size={12} strokeWidth={2} />
+                      Grant Repository Access
+                    </a>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div style={{ color: 'var(--text-secondary)', fontSize: '.85rem' }}>
               Status:{' '}
-              <strong>
-                {connection?.connected
-                  ? `Connected as ${connection.githubLogin}`
-                  : 'Not connected'}
-              </strong>
+              <strong>{statusLabel}</strong>
             </div>
             {!connection?.connected ? (
               <button className="btn btn-primary btn-sm" onClick={() => void handleGithubConnect()}>
@@ -92,10 +151,16 @@ export function IntegrationsPage() {
               </button>
             ) : null}
 
+            {connection?.connected && !hasRepositoryAccess && connection.installUrl ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
+                Repositories appear in Kereo only after the GitHub App is installed on them.
+              </div>
+            ) : null}
+
             <div style={{ display: 'grid', gap: 8 }}>
               {installations.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
-                  No visible installations yet.
+                  No repositories are ready yet.
                 </div>
               ) : (
                 installations.map((installation) => (

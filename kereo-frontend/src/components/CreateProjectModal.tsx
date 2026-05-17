@@ -58,6 +58,8 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
       ) ?? null,
     [repositories, form.githubRepositoryId],
   );
+  const needsRepositoryAccess =
+    githubConnected && !loadingGithub && installations.length === 0;
 
   function set(
     key: keyof CreateProjectDto,
@@ -243,7 +245,11 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     disabled={loading}
                   >
                     <option value="">
-                      {loadingGithub ? 'Loading installations…' : 'Select installation'}
+                      {loadingGithub
+                        ? 'Loading repository access...'
+                        : needsRepositoryAccess
+                          ? 'Grant repository access first'
+                          : 'Select installation'}
                     </option>
                     {installations.map((installation) => (
                       <option key={installation.id} value={installation.id}>
@@ -262,12 +268,21 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                           </a>
                         ) : null}
                       </>
-                    ) : installUrl ? (
+                    ) : needsRepositoryAccess && installUrl ? (
                       <>
-                        Need a repo here? Install the GitHub App in your account or org.
+                        Your account is connected. Grant the Kereo GitHub App access to the repos
+                        you want to deploy.
                         {' '}
                         <a href={installUrl} target="_blank" rel="noreferrer">
-                          Open install page
+                          Grant repository access
+                        </a>
+                      </>
+                    ) : installUrl ? (
+                      <>
+                        Need another repo here? Update the GitHub App installation in your account or org.
+                        {' '}
+                        <a href={installUrl} target="_blank" rel="noreferrer">
+                          Manage repository access
                         </a>
                       </>
                     ) : (
