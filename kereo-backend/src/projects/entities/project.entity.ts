@@ -75,10 +75,10 @@ export class Project {
   @Column({ type: 'bigint', nullable: true })
   githubRepositoryId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   githubRepositoryFullName: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   githubDefaultBranch: string | null;
 
   @ManyToOne(() => User, (user) => user.projects, {
