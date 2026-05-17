@@ -16,13 +16,13 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column({ select: false, nullable: true })
+  @Column({ type: 'varchar', select: false, nullable: true })
   password: string | null;
 
   @Column({ default: false })
   isEmailVerified: boolean;
 
-  @Column({ select: false, nullable: true })
+  @Column({ type: 'varchar', select: false, nullable: true })
   emailVerificationTokenHash: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
