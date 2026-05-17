@@ -98,6 +98,16 @@ resource "aws_ssm_parameter" "github_webhook_secret" {
   }
 }
 
+resource "aws_ssm_parameter" "github_app_private_key" {
+  name  = "/${var.project_name}/prod/GITHUB_APP_PRIVATE_KEY"
+  type  = "SecureString"
+  value = var.github_app_private_key
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
 module "ecs_service" {
   source = "./modules/ecs-service"
 
@@ -109,9 +119,10 @@ module "ecs_service" {
   container_image = var.container_image
   database_url    = local.database_url
 
-  database_url_param_arn          = aws_ssm_parameter.database_url.arn
-  jwt_secret_param_arn            = aws_ssm_parameter.jwt_secret.arn
-  github_webhook_secret_param_arn = aws_ssm_parameter.github_webhook_secret.arn
+  database_url_param_arn           = aws_ssm_parameter.database_url.arn
+  jwt_secret_param_arn             = aws_ssm_parameter.jwt_secret.arn
+  github_webhook_secret_param_arn  = aws_ssm_parameter.github_webhook_secret.arn
+  github_app_private_key_param_arn = aws_ssm_parameter.github_app_private_key.arn
 
   vpc_id                = module.network.vpc_id
   subnet_ids            = module.network.public_subnet_ids
@@ -128,6 +139,8 @@ module "ecs_service" {
   ecs_task_execution_role_arn = module.iam.ecs_task_execution_role_arn
   ecs_subnet_ids              = module.network.public_subnet_ids
   codebuild_project_name      = module.codebuild.project_name
+  github_app_id               = var.github_app_id
+  github_app_slug             = var.github_app_slug
   redis_host                  = module.redis.host
   redis_port                  = module.redis.port
   log_group_name              = module.ecs.log_group_name

@@ -140,9 +140,8 @@ export class GithubService {
 
   private createAppJwt() {
     const appId = process.env.GITHUB_APP_ID;
-    const privateKeyPem = process.env.GITHUB_APP_PRIVATE_KEY?.replace(
-      /\\n/g,
-      '\n',
+    const privateKeyPem = this.normalizePrivateKey(
+      process.env.GITHUB_APP_PRIVATE_KEY,
     );
 
     if (!appId || !privateKeyPem) {
@@ -169,10 +168,27 @@ export class GithubService {
     const signer = createSign('RSA-SHA256');
     signer.update(data);
     signer.end();
-    const privateKey = createPrivateKey(privateKeyPem);
+    const privateKey = createPrivateKey({
+      key: privateKeyPem,
+      format: 'pem',
+    });
     const signature = signer.sign(privateKey);
 
     return `${data}.${this.base64UrlEncode(signature)}`;
+  }
+
+  private normalizePrivateKey(value?: string) {
+    if (!value) {
+      return value;
+    }
+
+    const trimmed = value.trim();
+    const unwrapped =
+      trimmed.startsWith('"') && trimmed.endsWith('"')
+        ? trimmed.slice(1, -1)
+        : trimmed;
+
+    return unwrapped.replace(/\\n/g, '\n').replace(/\r\n/g, '\n');
   }
 
   private base64UrlEncode(value: string | Buffer) {

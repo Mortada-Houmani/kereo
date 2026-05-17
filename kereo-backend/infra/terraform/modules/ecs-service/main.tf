@@ -110,6 +110,14 @@ resource "aws_ecs_task_definition" "this" {
           value = var.codebuild_project_name
         },
         {
+          name  = "GITHUB_APP_ID"
+          value = var.github_app_id
+        },
+        {
+          name  = "GITHUB_APP_SLUG"
+          value = var.github_app_slug
+        },
+        {
           name  = "ECS_SECURITY_GROUP_ID"
           value = aws_security_group.ecs_tasks.id
         },
@@ -155,6 +163,10 @@ resource "aws_ecs_task_definition" "this" {
         {
           name      = "GITHUB_WEBHOOK_SECRET"
           valueFrom = var.github_webhook_secret_param_arn
+        },
+        {
+          name      = "GITHUB_APP_PRIVATE_KEY"
+          valueFrom = var.github_app_private_key_param_arn
         }
       ]
 

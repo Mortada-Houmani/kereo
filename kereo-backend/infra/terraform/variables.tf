@@ -58,6 +58,34 @@ variable "github_webhook_secret" {
   }
 }
 
+variable "github_app_id" {
+  type = string
+
+  validation {
+    condition     = length(var.github_app_id) > 0
+    error_message = "github_app_id must be set before applying."
+  }
+}
+
+variable "github_app_slug" {
+  type = string
+
+  validation {
+    condition     = length(var.github_app_slug) > 0
+    error_message = "github_app_slug must be set before applying."
+  }
+}
+
+variable "github_app_private_key" {
+  type      = string
+  sensitive = true
+
+  validation {
+    condition     = length(var.github_app_private_key) > 0
+    error_message = "github_app_private_key must be set before applying."
+  }
+}
+
 variable "container_image" {
   type = string
 }

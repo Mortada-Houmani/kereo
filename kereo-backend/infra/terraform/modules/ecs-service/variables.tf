@@ -60,6 +60,10 @@ variable "github_webhook_secret_param_arn" {
   type = string
 }
 
+variable "github_app_private_key_param_arn" {
+  type = string
+}
+
 variable "alb_dns_name" {
   type = string
 }
@@ -97,6 +101,14 @@ variable "ecs_subnet_ids" {
 }
 
 variable "codebuild_project_name" {
+  type = string
+}
+
+variable "github_app_id" {
+  type = string
+}
+
+variable "github_app_slug" {
   type = string
 }
 
