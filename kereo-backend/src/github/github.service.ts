@@ -159,10 +159,11 @@ export class GithubService {
     githubLogin: string | null;
     githubAvatarUrl: string | null;
     isEmailVerified: boolean;
+    githubAccessToken?: string | null;
   }) {
     return {
       installUrl: this.getInstallationUrl(),
-      connected: Boolean(input.githubLogin),
+      connected: Boolean(input.githubLogin && input.githubAccessToken),
       githubLogin: input.githubLogin,
       githubAvatarUrl: input.githubAvatarUrl,
       isEmailVerified: input.isEmailVerified,
