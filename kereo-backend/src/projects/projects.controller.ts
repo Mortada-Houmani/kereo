@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Patch,
   Param,
   Post,
   Req,
@@ -13,6 +14,8 @@ import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/authenticated-request';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
+import { UpsertProjectEnvVarDto } from './dto/upsert-project-env-var.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('projects')
@@ -35,6 +38,53 @@ export class ProjectsController {
   @Get(':id')
   findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.projectsService.findOne(id, req.user.id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() updateProjectDto: UpdateProjectDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.update(id, req.user.id, updateProjectDto);
+  }
+
+  @Get(':id/env')
+  listEnvVars(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.projectsService.listEnvVars(id, req.user.id);
+  }
+
+  @Post(':id/env')
+  upsertEnvVar(
+    @Param('id') id: string,
+    @Body() envVarDto: UpsertProjectEnvVarDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.upsertEnvVar(id, req.user.id, envVarDto);
+  }
+
+  @Patch(':id/env/:envVarId')
+  updateEnvVar(
+    @Param('id') id: string,
+    @Param('envVarId') envVarId: string,
+    @Body() envVarDto: UpsertProjectEnvVarDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.upsertEnvVar(
+      id,
+      req.user.id,
+      envVarDto,
+      envVarId,
+    );
+  }
+
+  @Delete(':id/env/:envVarId')
+  removeEnvVar(
+    @Param('id') id: string,
+    @Param('envVarId') envVarId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.projectsService.removeEnvVar(id, envVarId, req.user.id);
   }
 
   @Delete(':id')

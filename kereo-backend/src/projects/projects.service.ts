@@ -16,12 +16,16 @@ import { Client } from 'pg';
 import { Project } from './entities/project.entity';
 import { ProjectRuntimeType } from './entities/project.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
+import { UpsertProjectEnvVarDto } from './dto/upsert-project-env-var.dto';
 import { AwsProvisioningService } from '../aws/aws-provisioning.service';
+import { GithubService } from '../github/github.service';
 import {
   Deployment,
   DeploymentPhase,
   DeploymentStatus,
 } from '../deployments/entities/deployment.entity';
+import { ProjectEnvVar } from './entities/project-env-var.entity';
 
 type DeploymentSummary = {
   id: string;
@@ -43,9 +47,19 @@ type DeploymentSummary = {
   isTerminal: boolean;
 };
 
-type ProjectDashboard = Omit<Project, 'deployments'> & {
+type ProjectDashboard = Omit<Project, 'deployments' | 'envVars'> & {
   latestDeployment: DeploymentSummary | null;
   deployments: DeploymentSummary[];
+  envVars: Array<{
+    id: string;
+    key: string;
+    isSecret: boolean;
+    hasValue: boolean;
+    updatedAt: Date;
+  }>;
+  deployConfigValid: boolean;
+  deployConfigErrors: string[];
+  requiresRedeploy: boolean;
 };
 
 @Injectable()
@@ -55,7 +69,10 @@ export class ProjectsService {
   constructor(
     @InjectRepository(Project)
     private readonly projectsRepository: Repository<Project>,
+    @InjectRepository(ProjectEnvVar)
+    private readonly projectEnvVarsRepository: Repository<ProjectEnvVar>,
     private readonly awsProvisioningService: AwsProvisioningService,
+    private readonly githubService: GithubService,
   ) {}
 
   async create(createProjectDto: CreateProjectDto, userId: string) {
@@ -68,14 +85,33 @@ export class ProjectsService {
     const slug = await this.generateUniqueSlug(createProjectDto.name);
     const resourceName = this.buildProjectResourceName(slug);
 
+    const repoBinding = this.normalizeGithubBinding(createProjectDto);
+
+    if (
+      repoBinding.githubInstallationId &&
+      repoBinding.githubRepositoryFullName
+    ) {
+      await this.githubService.verifyRepositoryAccess(
+        repoBinding.githubInstallationId,
+        repoBinding.githubRepositoryFullName,
+      );
+    }
+
     const project = this.projectsRepository.create({
       ...createProjectDto,
+      repoUrl: repoBinding.repoUrl,
+      branch:
+        createProjectDto.branch ?? repoBinding.githubDefaultBranch ?? 'main',
       runtimeType,
       healthCheckPath,
       port,
       slug,
       ecsServiceName: `${resourceName}-service`,
       ecsTaskFamily: resourceName,
+      githubInstallationId: repoBinding.githubInstallationId,
+      githubRepositoryId: repoBinding.githubRepositoryId,
+      githubRepositoryFullName: repoBinding.githubRepositoryFullName,
+      githubDefaultBranch: repoBinding.githubDefaultBranch,
       user: {
         id: userId,
       },
@@ -99,7 +135,7 @@ export class ProjectsService {
 
       const hydratedProject = await this.projectsRepository.findOneOrFail({
         where: { id: savedProject.id },
-        relations: ['deployments'],
+        relations: ['deployments', 'envVars'],
       });
 
       return this.toProjectDashboard(hydratedProject);
@@ -127,7 +163,7 @@ export class ProjectsService {
             id: userId,
           },
         },
-        relations: ['deployments'],
+        relations: ['deployments', 'envVars'],
         order: {
           createdAt: 'DESC',
         },
@@ -142,8 +178,65 @@ export class ProjectsService {
     return this.toProjectDashboard(project);
   }
 
+  async update(id: string, userId: string, updateProjectDto: UpdateProjectDto) {
+    const project = await this.findOwnedProjectEntity(id, userId, true);
+    const repoBinding = this.normalizeGithubBinding(updateProjectDto, project);
+
+    if (
+      repoBinding.githubInstallationId &&
+      repoBinding.githubRepositoryFullName
+    ) {
+      await this.githubService.verifyRepositoryAccess(
+        repoBinding.githubInstallationId,
+        repoBinding.githubRepositoryFullName,
+      );
+    }
+
+    if (updateProjectDto.runtimeType) {
+      project.runtimeType = updateProjectDto.runtimeType;
+    }
+
+    if (updateProjectDto.name !== undefined) {
+      project.name = updateProjectDto.name;
+    }
+
+    if (updateProjectDto.branch !== undefined) {
+      project.branch = updateProjectDto.branch;
+    }
+
+    if (updateProjectDto.dockerfilePath !== undefined) {
+      project.dockerfilePath = updateProjectDto.dockerfilePath;
+    }
+
+    if (updateProjectDto.buildContext !== undefined) {
+      project.buildContext = updateProjectDto.buildContext;
+    }
+
+    if (updateProjectDto.port !== undefined) {
+      project.port = updateProjectDto.port;
+    }
+
+    if (updateProjectDto.healthCheckPath !== undefined) {
+      project.healthCheckPath = updateProjectDto.healthCheckPath;
+    }
+
+    project.repoUrl = repoBinding.repoUrl;
+    project.githubInstallationId = repoBinding.githubInstallationId;
+    project.githubRepositoryId = repoBinding.githubRepositoryId;
+    project.githubRepositoryFullName = repoBinding.githubRepositoryFullName;
+    project.githubDefaultBranch = repoBinding.githubDefaultBranch;
+
+    const savedProject = await this.projectsRepository.save(project);
+    const hydratedProject = await this.findOwnedProjectEntity(
+      savedProject.id,
+      userId,
+      true,
+    );
+    return this.toProjectDashboard(hydratedProject);
+  }
+
   async remove(id: string, userId: string) {
-    const project = await this.findOwnedProjectEntity(id, userId);
+    const project = await this.findOwnedProjectEntity(id, userId, true);
     const projectSnapshot = this.projectsRepository.create({
       ...project,
     });
@@ -154,6 +247,71 @@ export class ProjectsService {
     return {
       message: 'Project deletion started',
     };
+  }
+
+  async listEnvVars(id: string, userId: string) {
+    const project = await this.findOwnedProjectEntity(id, userId, true);
+    return this.toProjectDashboard(project).envVars;
+  }
+
+  async upsertEnvVar(
+    id: string,
+    userId: string,
+    input: UpsertProjectEnvVarDto,
+    envVarId?: string,
+  ) {
+    const project = await this.findOwnedProjectEntity(id, userId, true);
+    let envVar =
+      envVarId === undefined
+        ? await this.projectEnvVarsRepository.findOne({
+            where: {
+              project: { id: project.id },
+              key: input.key,
+            },
+          })
+        : await this.projectEnvVarsRepository.findOne({
+            where: {
+              id: envVarId,
+              project: { id: project.id },
+            },
+          });
+
+    if (!envVar) {
+      envVar = this.projectEnvVarsRepository.create({
+        key: input.key,
+        value: input.value ?? '',
+        isSecret: input.isSecret ?? false,
+        project,
+      });
+    } else {
+      envVar.key = input.key;
+      if (input.value !== undefined) {
+        envVar.value = input.value;
+      }
+      if (input.isSecret !== undefined) {
+        envVar.isSecret = input.isSecret;
+      }
+    }
+
+    await this.projectEnvVarsRepository.save(envVar);
+    return this.listEnvVars(id, userId);
+  }
+
+  async removeEnvVar(id: string, envVarId: string, userId: string) {
+    const project = await this.findOwnedProjectEntity(id, userId);
+    const envVar = await this.projectEnvVarsRepository.findOne({
+      where: {
+        id: envVarId,
+        project: { id: project.id },
+      },
+    });
+
+    if (!envVar) {
+      throw new NotFoundException('Environment variable not found');
+    }
+
+    await this.projectEnvVarsRepository.remove(envVar);
+    return this.listEnvVars(id, userId);
   }
 
   private async cleanupDeletedProjectResources(project: Project) {
@@ -243,11 +401,27 @@ export class ProjectsService {
       project.slug,
       project.id,
     );
-    const parameterName = this.buildProjectDatabaseParamName(project.id);
+    const parameterNames = [this.buildProjectDatabaseParamName(project.id)];
     const logGroupName = `/ecs/${project.slug}`;
 
+    const envVars = await this.projectEnvVarsRepository.find({
+      where: {
+        project: { id: project.id },
+      },
+    });
+
+    parameterNames.push(
+      ...envVars
+        .filter((envVar) => envVar.isSecret)
+        .map((envVar) =>
+          this.buildProjectSecretParamName(project.id, envVar.key),
+        ),
+    );
+
     await this.dropProjectDatabase(coreDatabaseUrl, databaseName);
-    await this.deleteProjectDatabaseParameter(awsRegion, parameterName);
+    for (const parameterName of parameterNames) {
+      await this.deleteProjectDatabaseParameter(awsRegion, parameterName);
+    }
     await this.deleteProjectLogGroup(awsRegion, logGroupName);
   }
 
@@ -271,6 +445,11 @@ export class ProjectsService {
   private buildProjectDatabaseParamName(projectId: string) {
     const projectName = process.env.PROJECT_NAME ?? 'kereo-v2';
     return `/${projectName}/prod/apps/${projectId}/DATABASE_URL`;
+  }
+
+  private buildProjectSecretParamName(projectId: string, key: string) {
+    const projectName = process.env.PROJECT_NAME ?? 'kereo-v2';
+    return `/${projectName}/prod/apps/${projectId}/env/${key}`;
   }
 
   private async dropProjectDatabase(
@@ -368,7 +547,7 @@ export class ProjectsService {
           id: userId,
         },
       },
-      relations: includeDeployments ? ['deployments'] : [],
+      relations: includeDeployments ? ['deployments', 'envVars'] : ['envVars'],
     });
 
     if (!project) {
@@ -386,10 +565,119 @@ export class ProjectsService {
     const { deployments: projectDeployments, ...projectFields } = project;
     void projectDeployments;
 
+    const deployConfigErrors = this.getDeployConfigErrors(project);
+    const latestDeployment = deployments[0] ?? null;
+    const configUpdatedAt = [
+      project.updatedAt.getTime(),
+      ...(project.envVars ?? []).map((envVar) => envVar.updatedAt.getTime()),
+    ].reduce((max, value) => Math.max(max, value), 0);
+
     return {
       ...projectFields,
-      latestDeployment: deployments[0] ?? null,
+      envVars: (project.envVars ?? [])
+        .slice()
+        .sort((a, b) => a.key.localeCompare(b.key))
+        .map((envVar) => ({
+          id: envVar.id,
+          key: envVar.key,
+          isSecret: envVar.isSecret,
+          hasValue: Boolean(envVar.value),
+          updatedAt: envVar.updatedAt,
+        })),
+      latestDeployment,
       deployments,
+      deployConfigValid: deployConfigErrors.length === 0,
+      deployConfigErrors,
+      requiresRedeploy:
+        latestDeployment !== null &&
+        configUpdatedAt > new Date(latestDeployment.createdAt).getTime(),
+    };
+  }
+
+  async getProjectEnvVarValues(projectId: string) {
+    return this.projectEnvVarsRepository.find({
+      where: { project: { id: projectId } },
+      select: {
+        id: true,
+        key: true,
+        value: true,
+        isSecret: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  private getDeployConfigErrors(project: Project) {
+    const errors: string[] = [];
+
+    if (!project.repoUrl) {
+      errors.push('Repository is not configured.');
+    }
+
+    if (!project.branch) {
+      errors.push('Branch is not configured.');
+    }
+
+    if (!project.dockerfilePath) {
+      errors.push('Dockerfile path is required.');
+    }
+
+    if (!project.buildContext) {
+      errors.push('Build context is required.');
+    }
+
+    if (!project.healthCheckPath?.startsWith('/')) {
+      errors.push('Health check path must start with "/".');
+    }
+
+    if (!project.port || project.port < 1) {
+      errors.push('Port must be greater than 0.');
+    }
+
+    if (
+      project.githubInstallationId &&
+      (!project.githubRepositoryFullName || !project.githubRepositoryId)
+    ) {
+      errors.push(
+        'GitHub installation is connected but repository binding is incomplete.',
+      );
+    }
+
+    return errors;
+  }
+
+  private normalizeGithubBinding(
+    input:
+      | CreateProjectDto
+      | UpdateProjectDto
+      | (CreateProjectDto & UpdateProjectDto),
+    existingProject?: Project,
+  ) {
+    const githubInstallationId =
+      input.githubInstallationId ??
+      existingProject?.githubInstallationId ??
+      null;
+    const githubRepositoryId =
+      input.githubRepositoryId ?? existingProject?.githubRepositoryId ?? null;
+    const githubRepositoryFullName =
+      input.githubRepositoryFullName ??
+      existingProject?.githubRepositoryFullName ??
+      null;
+    const githubDefaultBranch =
+      input.githubDefaultBranch ?? existingProject?.githubDefaultBranch ?? null;
+    const repoUrl =
+      input.repoUrl ??
+      (githubRepositoryFullName
+        ? `https://github.com/${githubRepositoryFullName}.git`
+        : (existingProject?.repoUrl ?? ''));
+
+    return {
+      githubInstallationId,
+      githubRepositoryId,
+      githubRepositoryFullName,
+      githubDefaultBranch,
+      repoUrl,
     };
   }
 

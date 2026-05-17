@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Deployment } from '../../deployments/entities/deployment.entity';
+import { ProjectEnvVar } from './project-env-var.entity';
 
 export enum ProjectRuntimeType {
   WEB_SERVER = 'web-server',
@@ -68,6 +69,18 @@ export class Project {
   @Column({ nullable: true })
   publicUrl: string;
 
+  @Column({ type: 'bigint', nullable: true })
+  githubInstallationId: string | null;
+
+  @Column({ type: 'bigint', nullable: true })
+  githubRepositoryId: string | null;
+
+  @Column({ nullable: true })
+  githubRepositoryFullName: string | null;
+
+  @Column({ nullable: true })
+  githubDefaultBranch: string | null;
+
   @ManyToOne(() => User, (user) => user.projects, {
     onDelete: 'CASCADE',
   })
@@ -75,6 +88,11 @@ export class Project {
 
   @OneToMany(() => Deployment, (deployment) => deployment.project)
   deployments: Deployment[];
+
+  @OneToMany(() => ProjectEnvVar, (envVar) => envVar.project, {
+    cascade: ['insert', 'update'],
+  })
+  envVars: ProjectEnvVar[];
 
   @CreateDateColumn()
   createdAt: Date;

@@ -10,10 +10,14 @@ type RawBodyRequest = Request & {
 type GithubWebhookPayload = {
   ref?: string;
   after?: string;
+  installation?: {
+    id?: number;
+  };
   pusher?: {
     name?: string;
   };
   repository?: {
+    id?: number;
     full_name?: string;
   };
 };

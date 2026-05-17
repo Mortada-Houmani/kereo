@@ -10,6 +10,8 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
   async onApplicationBootstrap() {
     await this.ensureDeploymentDashboardColumns();
     await this.ensureProjectRuntimeColumns();
+    await this.ensureProjectGithubColumns();
+    await this.ensureProjectEnvVarTable();
   }
 
   private async ensureDeploymentDashboardColumns() {
@@ -41,5 +43,40 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     `);
 
     this.logger.log('Project runtime schema is ready');
+  }
+
+  private async ensureProjectGithubColumns() {
+    await this.dataSource.query(`
+      ALTER TABLE projects
+        ADD COLUMN IF NOT EXISTS "githubInstallationId" bigint,
+        ADD COLUMN IF NOT EXISTS "githubRepositoryId" bigint,
+        ADD COLUMN IF NOT EXISTS "githubRepositoryFullName" varchar,
+        ADD COLUMN IF NOT EXISTS "githubDefaultBranch" varchar
+    `);
+
+    this.logger.log('Project GitHub schema is ready');
+  }
+
+  private async ensureProjectEnvVarTable() {
+    await this.dataSource.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
+
+    await this.dataSource.query(`
+      CREATE TABLE IF NOT EXISTS project_env_vars (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        key varchar NOT NULL,
+        value text NOT NULL DEFAULT '',
+        "isSecret" boolean NOT NULL DEFAULT false,
+        "projectId" uuid REFERENCES projects(id) ON DELETE CASCADE,
+        "createdAt" timestamptz NOT NULL DEFAULT now(),
+        "updatedAt" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+
+    await this.dataSource.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_project_env_vars_projectId"
+      ON project_env_vars ("projectId")
+    `);
+
+    this.logger.log('Project env var schema is ready');
   }
 }

@@ -29,6 +29,8 @@ import {
   DeploymentPhase,
   DeploymentStatus,
 } from '../entities/deployment.entity';
+import { GithubService } from '../../github/github.service';
+import { ProjectsService } from '../../projects/projects.service';
 
 @Injectable()
 @Processor('deployments', {
@@ -41,6 +43,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
   constructor(
     @InjectRepository(Deployment)
     private readonly deploymentsRepository: Repository<Deployment>,
+    private readonly githubService: GithubService,
+    private readonly projectsService: ProjectsService,
   ) {
     super();
     console.log('DeploymentsProcessor initialized');
@@ -178,6 +182,9 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         resolvedCoreDatabaseUrl,
         projectDatabaseName,
       );
+      const projectEnvVars = await this.projectsService.getProjectEnvVarValues(
+        deployment.project.id,
+      );
       const projectDatabaseParamName = this.buildProjectDatabaseParamName(
         deployment.project.id,
       );
@@ -186,6 +193,14 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         awsAccountId: resolvedAwsAccountId,
         parameterName: projectDatabaseParamName,
       });
+      const githubToken =
+        deployment.project.githubInstallationId &&
+        deployment.project.githubRepositoryFullName
+          ? await this.githubService.getInstallationToken(
+              deployment.project.githubInstallationId,
+            )
+          : null;
+
       const existingCodeBuildId = await this.findReusableCodeBuildId(
         codebuildClient,
         deployment,
@@ -209,8 +224,12 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             'Starting CodeBuild image build...',
             `Repository: ${deployment.project.repoUrl}`,
             `Branch: ${branch}`,
+            `Runtime: ${deployment.project.runtimeType}`,
+            `Health check: ${deployment.project.healthCheckPath}`,
             `Build context: ${buildContext}`,
             `Dockerfile: ${dockerfilePath}`,
+            `Environment vars: ${projectEnvVars.filter((envVar) => !envVar.isSecret).length}`,
+            `Secret vars: ${projectEnvVars.filter((envVar) => envVar.isSecret).length}`,
             '',
           ].join('\n'),
         );
@@ -245,6 +264,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             ecrRegistry,
             port,
             appBasePath: '/',
+            githubToken,
           });
 
       if (!existingCodeBuildId) {
@@ -347,6 +367,11 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         `Using SSM Parameter Store secrets.\nDATABASE_URL parameter: ${projectDatabaseParamArn}\nJWT_SECRET parameter: ${resolvedJwtSecretParamArn}\n`,
       );
 
+      const secretEnvParams = await this.putProjectSecretParameters(ssmClient, {
+        projectId: deployment.project.id,
+        envVars: projectEnvVars,
+      });
+
       const taskDefinitionArn = await this.registerTaskDefinition(ecsClient, {
         family: projectEcsTaskFamily,
         executionRoleArn: resolvedEcsTaskExecutionRoleArn,
@@ -356,6 +381,13 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         databaseUrlParamArn: projectDatabaseParamArn,
         jwtSecretParamArn: resolvedJwtSecretParamArn,
         awsRegion: resolvedAwsRegion,
+        envVars: projectEnvVars
+          .filter((envVar) => !envVar.isSecret)
+          .map((envVar) => ({
+            name: envVar.key,
+            value: envVar.value,
+          })),
+        secretEnvVars: secretEnvParams,
       });
 
       await this.appendLog(
@@ -741,6 +773,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       ecrRegistry: string;
       port: number;
       appBasePath: string;
+      githubToken: string | null;
     },
   ) {
     const buildResult = await codebuildClient.send(
@@ -771,6 +804,15 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             value: input.appBasePath,
             type: 'PLAINTEXT',
           },
+          ...(input.githubToken
+            ? [
+                {
+                  name: 'GITHUB_TOKEN',
+                  value: input.githubToken,
+                  type: 'PLAINTEXT' as const,
+                },
+              ]
+            : []),
         ],
       }),
     );
@@ -886,6 +928,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       databaseUrlParamArn: string;
       jwtSecretParamArn: string;
       awsRegion: string;
+      envVars: Array<{ name: string; value: string }>;
+      secretEnvVars: Array<{ name: string; valueFrom: string }>;
     },
   ) {
     const taskDefinitionResult = await ecsClient.send(
@@ -916,6 +960,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
                 name: 'PORT',
                 value: String(input.port),
               },
+              ...input.envVars,
             ],
             secrets: [
               {
@@ -926,6 +971,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
                 name: 'JWT_SECRET',
                 valueFrom: input.jwtSecretParamArn,
               },
+              ...input.secretEnvVars,
             ],
             logConfiguration: {
               logDriver: 'awslogs',
@@ -949,6 +995,56 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
     }
 
     return taskDefinitionArn;
+  }
+
+  private buildProjectSecretParamName(projectId: string, key: string) {
+    const projectName = process.env.PROJECT_NAME ?? 'kereo-v2';
+    return `/${projectName}/prod/apps/${projectId}/env/${key}`;
+  }
+
+  private async putProjectSecretParameters(
+    ssmClient: SSMClient,
+    input: {
+      projectId: string;
+      envVars: Array<{
+        key: string;
+        value: string;
+        isSecret: boolean;
+      }>;
+    },
+  ) {
+    const secretEnvVars = input.envVars.filter((envVar) => envVar.isSecret);
+    const awsRegion = process.env.AWS_REGION;
+    const awsAccountId = process.env.AWS_ACCOUNT_ID;
+
+    if (!awsRegion || !awsAccountId) {
+      throw new Error(
+        'Missing AWS region/account configuration for project secret parameters',
+      );
+    }
+
+    const results: Array<{ name: string; valueFrom: string }> = [];
+
+    for (const envVar of secretEnvVars) {
+      const parameterName = this.buildProjectSecretParamName(
+        input.projectId,
+        envVar.key,
+      );
+      await this.putProjectDatabaseUrlParameter(ssmClient, {
+        parameterName,
+        databaseUrl: envVar.value,
+      });
+      results.push({
+        name: envVar.key,
+        valueFrom: this.buildParameterArn({
+          awsRegion,
+          awsAccountId,
+          parameterName,
+        }),
+      });
+    }
+
+    return results;
   }
 
   private async createEcsService(

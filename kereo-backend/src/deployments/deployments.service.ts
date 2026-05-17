@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -31,7 +35,18 @@ export class DeploymentsService {
     const project = await this.projectsService.findOwnedProjectEntity(
       projectId,
       userId,
+      true,
     );
+    const projectDashboard = await this.projectsService.findOne(
+      projectId,
+      userId,
+    );
+
+    if (!projectDashboard.deployConfigValid) {
+      throw new BadRequestException(
+        `Deployment configuration is incomplete: ${projectDashboard.deployConfigErrors.join(' ')}`,
+      );
+    }
 
     const deployment = this.deploymentsRepository.create({
       status: DeploymentStatus.QUEUED,

@@ -91,7 +91,13 @@ resource "aws_codebuild_project" "this" {
             - git --version
             - aws --version
             - docker --version
-            - git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" source
+            - |
+              if [ -n "$${GITHUB_TOKEN:-}" ] && echo "$REPO_URL" | grep -qi 'github.com'; then
+                AUTH_REPO_URL=$(echo "$REPO_URL" | sed -E 's#https://github.com/#https://x-access-token:'"$${GITHUB_TOKEN}"'@github.com/#')
+                git clone --branch "$REPO_BRANCH" --single-branch "$AUTH_REPO_URL" source
+              else
+                git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" source
+              fi
             - cd "source/$BUILD_CONTEXT"
             - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
         build:

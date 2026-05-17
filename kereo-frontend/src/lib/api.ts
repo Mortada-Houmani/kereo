@@ -107,28 +107,99 @@ export interface Project {
   targetGroupArn: string | null;
   listenerRuleArn: string | null;
   publicUrl: string | null;
+  githubInstallationId: string | null;
+  githubRepositoryId: string | null;
+  githubRepositoryFullName: string | null;
+  githubDefaultBranch: string | null;
+  envVars: ProjectEnvVar[];
+  deployConfigValid: boolean;
+  deployConfigErrors: string[];
+  requiresRedeploy: boolean;
   latestDeployment: DeploymentSummary | null;
   deployments: DeploymentSummary[];
   createdAt: string;
   updatedAt: string;
 }
 
+export interface ProjectEnvVar {
+  id: string;
+  key: string;
+  isSecret: boolean;
+  hasValue: boolean;
+  updatedAt: string;
+}
+
 export interface CreateProjectDto {
   name: string;
-  repoUrl: string;
+  repoUrl?: string;
   branch?: string;
   dockerfilePath?: string;
   buildContext?: string;
   port?: number;
   runtimeType?: ProjectRuntimeType;
   healthCheckPath?: string;
+  githubInstallationId?: string;
+  githubRepositoryId?: string;
+  githubRepositoryFullName?: string;
+  githubDefaultBranch?: string;
+}
+
+export type UpdateProjectDto = Partial<CreateProjectDto>;
+
+export interface UpsertProjectEnvVarDto {
+  key: string;
+  value?: string;
+  isSecret?: boolean;
+}
+
+export interface GithubAppInfo {
+  installUrl: string | null;
+}
+
+export interface GithubInstallation {
+  id: string;
+  accountLogin: string;
+}
+
+export interface GithubRepository {
+  id: string;
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+  repoUrl: string;
+  htmlUrl: string;
 }
 
 export const projectsApi = {
   list: () => apiClient.get<Project[]>('/projects'),
   get: (id: string) => apiClient.get<Project>(`/projects/${id}`),
   create: (dto: CreateProjectDto) => apiClient.post<Project>('/projects', dto),
+  update: (id: string, dto: UpdateProjectDto) =>
+    apiClient.patch<Project>(`/projects/${id}`, dto),
+  listEnvVars: (id: string) =>
+    apiClient.get<ProjectEnvVar[]>(`/projects/${id}/env`),
+  createEnvVar: (id: string, dto: UpsertProjectEnvVarDto) =>
+    apiClient.post<ProjectEnvVar[]>(`/projects/${id}/env`, dto),
+  updateEnvVar: (id: string, envVarId: string, dto: UpsertProjectEnvVarDto) =>
+    apiClient.patch<ProjectEnvVar[]>(`/projects/${id}/env/${envVarId}`, dto),
+  deleteEnvVar: (id: string, envVarId: string) =>
+    apiClient.delete<ProjectEnvVar[]>(`/projects/${id}/env/${envVarId}`),
   delete: (id: string) => apiClient.delete(`/projects/${id}`),
+};
+
+export const githubApi = {
+  getAppInfo: () => apiClient.get<GithubAppInfo>('/github/app'),
+  listInstallations: () => apiClient.get<GithubInstallation[]>('/github/installations'),
+  listRepositories: (installationId: string) =>
+    apiClient.get<GithubRepository[]>(
+      `/github/installations/${installationId}/repositories`,
+    ),
+  listBranches: (installationId: string, fullName: string) => {
+    const [owner, repo] = fullName.split('/');
+    return apiClient.get<string[]>(
+      `/github/installations/${installationId}/repositories/${owner}/${repo}/branches`,
+    );
+  },
 };
 
 // ── Deployments ───────────────────────────────────────────────────────────────

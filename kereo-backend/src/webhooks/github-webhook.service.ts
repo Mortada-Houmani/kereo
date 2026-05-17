@@ -13,10 +13,14 @@ import { DeploymentsService } from '../deployments/deployments.service';
 type GitHubPushPayload = {
   ref?: string;
   after?: string;
+  installation?: {
+    id?: number;
+  };
   pusher?: {
     name?: string;
   };
   repository?: {
+    id?: number;
     full_name?: string;
   };
 };
@@ -54,6 +58,8 @@ export class GithubWebhookService implements OnModuleInit {
     }
 
     const repositoryFullName = input.payload.repository?.full_name;
+    const repositoryId = input.payload.repository?.id;
+    const installationId = input.payload.installation?.id;
     const branch = this.refToBranch(input.payload.ref);
     const commitSha = input.payload.after;
     const pusherName = input.payload.pusher?.name;
@@ -69,7 +75,12 @@ export class GithubWebhookService implements OnModuleInit {
       };
     }
 
-    const project = await this.findMatchingProject(repositoryFullName, branch);
+    const project = await this.findMatchingProject({
+      repositoryFullName,
+      repositoryId: repositoryId ? String(repositoryId) : undefined,
+      installationId: installationId ? String(installationId) : undefined,
+      branch,
+    });
 
     if (!project || !project.user?.id) {
       console.log(
@@ -151,27 +162,41 @@ export class GithubWebhookService implements OnModuleInit {
     return ref.slice(prefix.length);
   }
 
-  private async findMatchingProject(
-    repositoryFullName: string,
-    branch: string,
-  ) {
+  private async findMatchingProject(input: {
+    repositoryFullName: string;
+    repositoryId?: string;
+    installationId?: string;
+    branch: string;
+  }) {
     const projects = await this.projectsRepository.find({
       where: {
-        branch,
+        branch: input.branch,
       },
       relations: ['user'],
     });
 
-    const normalizedRepositoryFullName = repositoryFullName.toLowerCase();
+    const normalizedRepositoryFullName = input.repositoryFullName.toLowerCase();
 
     console.log(
-      `Checking ${projects.length} project(s) on branch ${branch} for repo ${normalizedRepositoryFullName}`,
+      `Checking ${projects.length} project(s) on branch ${input.branch} for repo ${normalizedRepositoryFullName}`,
     );
 
-    return projects.find(
-      (project) =>
-        this.repoUrlToFullName(project.repoUrl) ===
-        normalizedRepositoryFullName,
+    return (
+      projects.find(
+        (project) =>
+          project.githubInstallationId === input.installationId &&
+          project.githubRepositoryId === input.repositoryId,
+      ) ??
+      projects.find(
+        (project) =>
+          project.githubRepositoryFullName?.toLowerCase() ===
+          normalizedRepositoryFullName,
+      ) ??
+      projects.find(
+        (project) =>
+          this.repoUrlToFullName(project.repoUrl) ===
+          normalizedRepositoryFullName,
+      )
     );
   }
 

@@ -3,62 +3,58 @@ import {
   IsInt,
   IsOptional,
   IsString,
-  IsUrl,
   Matches,
   Min,
 } from 'class-validator';
 import { ProjectRuntimeType } from '../entities/project.entity';
 
-export class CreateProjectDto {
+export class UpdateProjectDto {
   @IsString()
-  name: string;
-
   @IsOptional()
-  @IsUrl()
+  name?: string;
+
+  @IsString()
+  @IsOptional()
   repoUrl?: string;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
   branch?: string;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
   dockerfilePath?: string;
 
+  @IsString()
   @IsOptional()
+  buildContext?: string;
+
   @IsInt()
   @Min(1)
+  @IsOptional()
   port?: number;
 
-  @IsOptional()
-  @IsString()
   @IsIn(Object.values(ProjectRuntimeType))
+  @IsOptional()
   runtimeType?: ProjectRuntimeType;
 
-  @IsOptional()
-  @IsString()
   @Matches(/^\//, {
     message: 'healthCheckPath must start with "/"',
   })
+  @IsOptional()
   healthCheckPath?: string;
 
   @IsOptional()
-  @IsString()
-  buildContext?: string;
+  githubInstallationId?: string | null;
 
   @IsOptional()
-  @IsString()
-  githubInstallationId?: string;
+  githubRepositoryId?: string | null;
 
-  @IsOptional()
   @IsString()
-  githubRepositoryId?: string;
+  @IsOptional()
+  githubRepositoryFullName?: string | null;
 
-  @IsOptional()
   @IsString()
-  githubRepositoryFullName?: string;
-
   @IsOptional()
-  @IsString()
-  githubDefaultBranch?: string;
+  githubDefaultBranch?: string | null;
 }

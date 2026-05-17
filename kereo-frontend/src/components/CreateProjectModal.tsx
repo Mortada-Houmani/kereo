@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   X,
   Loader2,
@@ -11,7 +11,10 @@ import {
 } from 'lucide-react';
 import {
   projectsApi,
+  githubApi,
   type CreateProjectDto,
+  type GithubInstallation,
+  type GithubRepository,
   type ProjectRuntimeType,
 } from '../lib/api';
 import './CreateProjectModal.css';
@@ -40,7 +43,20 @@ const runtimeDefaults: Record<ProjectRuntimeType, number> = {
 export function CreateProjectModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState<CreateProjectDto>(defaults);
   const [loading, setLoading] = useState(false);
+  const [loadingGithub, setLoadingGithub] = useState(true);
   const [error, setError] = useState('');
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
+  const [installations, setInstallations] = useState<GithubInstallation[]>([]);
+  const [repositories, setRepositories] = useState<GithubRepository[]>([]);
+  const [branches, setBranches] = useState<string[]>([]);
+
+  const selectedRepository = useMemo(
+    () =>
+      repositories.find(
+        (repository) => repository.id === form.githubRepositoryId,
+      ) ?? null,
+    [repositories, form.githubRepositoryId],
+  );
 
   function set(
     key: keyof CreateProjectDto,
@@ -65,6 +81,76 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
     });
   }
 
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([githubApi.getAppInfo(), githubApi.listInstallations()])
+      .then(([appInfoRes, installationsRes]) => {
+        if (cancelled) return;
+        setInstallUrl(appInfoRes.data.installUrl);
+        setInstallations(installationsRes.data);
+        if (installationsRes.data.length === 1) {
+          setForm((current) => ({
+            ...current,
+            githubInstallationId: installationsRes.data[0].id,
+          }));
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError('Failed to load GitHub app repositories');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingGithub(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!form.githubInstallationId) {
+      return;
+    }
+
+    let cancelled = false;
+    githubApi
+      .listRepositories(form.githubInstallationId)
+      .then((res) => {
+        if (cancelled) return;
+        setRepositories(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load GitHub repositories');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.githubInstallationId]);
+
+  useEffect(() => {
+    if (!form.githubInstallationId || !form.githubRepositoryFullName) {
+      return;
+    }
+
+    let cancelled = false;
+    githubApi
+      .listBranches(form.githubInstallationId, form.githubRepositoryFullName)
+      .then((res) => {
+        if (cancelled) return;
+        setBranches(res.data);
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load repository branches');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.githubInstallationId, form.githubRepositoryFullName]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -73,6 +159,7 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
       await projectsApi.create({
         ...form,
         port: Number(form.port),
+        repoUrl: selectedRepository?.repoUrl ?? form.repoUrl,
       });
       onCreated();
     } catch (err: unknown) {
@@ -123,19 +210,85 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
               <span className="section-label">Repository Configuration</span>
               <div className="form-grid">
                 <div className="field">
+                  <label className="label" htmlFor="proj-installation">
+                    <Globe size={11} style={{ marginRight: 4 }} />
+                    GitHub Installation
+                  </label>
+                  <select
+                    id="proj-installation"
+                    value={form.githubInstallationId ?? ''}
+                    onChange={e => {
+                      const installationId = e.target.value || undefined;
+                      setForm((current) => ({
+                        ...current,
+                        githubInstallationId: installationId,
+                        githubRepositoryId: undefined,
+                        githubRepositoryFullName: undefined,
+                        githubDefaultBranch: undefined,
+                        repoUrl: '',
+                        branch: 'main',
+                      }));
+                      setRepositories([]);
+                      setBranches([]);
+                    }}
+                    disabled={loading}
+                  >
+                    <option value="">
+                      {loadingGithub ? 'Loading installations…' : 'Select installation'}
+                    </option>
+                    {installations.map((installation) => (
+                      <option key={installation.id} value={installation.id}>
+                        {installation.accountLogin}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="field-hint">
+                    {installUrl ? (
+                      <>
+                        Need a repo here? Install the GitHub App in your account or org.
+                        {' '}
+                        <a href={installUrl} target="_blank" rel="noreferrer">
+                          Open install page
+                        </a>
+                      </>
+                    ) : (
+                      'Configure the GitHub App to browse installed repositories.'
+                    )}
+                  </span>
+                </div>
+
+                <div className="field">
                   <label className="label" htmlFor="proj-repo">
                     <Globe size={11} style={{ marginRight: 4 }} />
-                    GitHub Repository URL
+                    Repository
                   </label>
-                  <input
+                  <select
                     id="proj-repo"
-                    value={form.repoUrl}
-                    onChange={e => set('repoUrl', e.target.value)}
-                    placeholder="https://github.com/org/repo"
+                    value={form.githubRepositoryId ?? ''}
+                    onChange={e => {
+                      const repository =
+                        repositories.find((item) => item.id === e.target.value) ?? null;
+                      setForm((current) => ({
+                        ...current,
+                        githubRepositoryId: repository?.id,
+                        githubRepositoryFullName: repository?.fullName,
+                        githubDefaultBranch: repository?.defaultBranch,
+                        repoUrl: repository?.repoUrl ?? '',
+                        branch: repository?.defaultBranch ?? current.branch,
+                      }));
+                      setBranches([]);
+                    }}
                     required
-                    disabled={loading}
-                  />
-                  <span className="field-hint">Public repository for now.</span>
+                    disabled={loading || !form.githubInstallationId}
+                  >
+                    <option value="">Select repository</option>
+                    {repositories.map((repository) => (
+                      <option key={repository.id} value={repository.id}>
+                        {repository.fullName}
+                        {repository.private ? ' (private)' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="field">
@@ -143,13 +296,24 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     <GitBranch size={11} style={{ marginRight: 4 }} />
                     Default Branch
                   </label>
-                  <input
+                  <select
                     id="proj-branch"
                     value={form.branch}
                     onChange={e => set('branch', e.target.value)}
-                    placeholder="main"
-                    disabled={loading}
-                  />
+                    disabled={loading || branches.length === 0}
+                  >
+                    {branches.length === 0 ? (
+                      <option value={form.branch ?? 'main'}>
+                        {form.branch ?? 'main'}
+                      </option>
+                    ) : (
+                      branches.map((branch) => (
+                        <option key={branch} value={branch}>
+                          {branch}
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
               </div>
             </div>

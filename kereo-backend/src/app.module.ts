@@ -8,6 +8,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { DeploymentsModule } from './deployments/deployments.module';
 import { BullModule } from '@nestjs/bullmq';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { GithubModule } from './github/github.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseSchemaService } from './database-schema.service';
@@ -69,6 +70,7 @@ import { DatabaseSchemaService } from './database-schema.service';
     AuthModule,
     ProjectsModule,
     DeploymentsModule,
+    GithubModule,
     WebhooksModule,
   ],
   controllers: [AppController],

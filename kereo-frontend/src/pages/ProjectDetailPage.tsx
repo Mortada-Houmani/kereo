@@ -5,8 +5,19 @@ import {
   Server, Database, Globe, GitBranch, GitCommit,
   AlertTriangle, Zap,
   HeartPulse,
+  Save,
+  Shield,
+  Settings2,
+  Plus,
+  X,
 } from 'lucide-react';
-import { projectsApi, deploymentsApi, type Project, type DeploymentSummary } from '../lib/api';
+import {
+  projectsApi,
+  deploymentsApi,
+  type Project,
+  type DeploymentSummary,
+  type UpdateProjectDto,
+} from '../lib/api';
 import { StatusBadge } from '../components/StatusBadge';
 import { DeploymentRow } from '../components/DeploymentRow';
 import { DeploymentDetailPanel } from '../components/DeploymentDetailPanel';
@@ -26,6 +37,19 @@ export function ProjectDetailPage() {
   const [showDanger, setShowDanger] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState('');
+  const [newEnvKey, setNewEnvKey] = useState('');
+  const [newEnvValue, setNewEnvValue] = useState('');
+  const [newEnvSecret, setNewEnvSecret] = useState(false);
+  const [projectForm, setProjectForm] = useState<UpdateProjectDto>({
+    branch: '',
+    dockerfilePath: '',
+    buildContext: '',
+    port: 3000,
+    runtimeType: 'web-server',
+    healthCheckPath: '/',
+  });
 
   const load = useCallback(async (silent = false) => {
     if (!id) return;
@@ -34,6 +58,15 @@ export function ProjectDetailPage() {
     try {
       const res = await projectsApi.get(id);
       setProject(res.data);
+      setProjectForm({
+        name: res.data.name,
+        branch: res.data.branch,
+        dockerfilePath: res.data.dockerfilePath,
+        buildContext: res.data.buildContext,
+        port: res.data.port,
+        runtimeType: res.data.runtimeType,
+        healthCheckPath: res.data.healthCheckPath,
+      });
       setSelectedDep(prev =>
         prev
           ? (res.data.deployments.find(d => d.id === prev.id) ?? res.data.deployments[0] ?? null)
@@ -140,6 +173,66 @@ export function ProjectDetailPage() {
   const latestDep = project.latestDeployment;
   const isActive = latestDep && !latestDep.isTerminal;
 
+  async function handleSaveSettings() {
+    if (!id) return;
+    setSavingSettings(true);
+    setSettingsMessage('');
+    try {
+      const res = await projectsApi.update(id, projectForm);
+      setProject(res.data);
+      setSettingsMessage('Settings saved. Redeploy to apply runtime changes.');
+    } catch {
+      setSettingsMessage('Failed to save project settings.');
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function handleAddEnvVar() {
+    if (!id || !newEnvKey) return;
+    setSettingsMessage('');
+    try {
+      const res = await projectsApi.createEnvVar(id, {
+        key: newEnvKey,
+        value: newEnvValue,
+        isSecret: newEnvSecret,
+      });
+      setProject((current) =>
+        current
+          ? {
+              ...current,
+              envVars: res.data,
+              requiresRedeploy: true,
+            }
+          : current,
+      );
+      setNewEnvKey('');
+      setNewEnvValue('');
+      setNewEnvSecret(false);
+    } catch {
+      setSettingsMessage('Failed to save environment variable.');
+    }
+  }
+
+  async function handleRemoveEnvVar(envVarId: string) {
+    if (!id) return;
+    setSettingsMessage('');
+    try {
+      const res = await projectsApi.deleteEnvVar(id, envVarId);
+      setProject((current) =>
+        current
+          ? {
+              ...current,
+              envVars: res.data,
+              requiresRedeploy: true,
+            }
+          : current,
+      );
+    } catch {
+      setSettingsMessage('Failed to remove environment variable.');
+    }
+  }
+
   return (
     <div className="detail-page fade-up">
       {/* Breadcrumb */}
@@ -239,6 +332,225 @@ export function ProjectDetailPage() {
             </span>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div className="section-label" style={{ marginBottom: 6 }}>
+              <Settings2 size={12} /> Project Settings
+            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
+              GitHub binding, runtime config, and deploy environment in one place.
+            </div>
+          </div>
+          {project.requiresRedeploy && (
+            <span className="badge badge-warn">Configuration changed. Redeploy required.</span>
+          )}
+        </div>
+
+        {!project.deployConfigValid && (
+          <div className="delete-modal-error" style={{ marginBottom: 14 }}>
+            <AlertTriangle size={14} strokeWidth={2} />
+            <span>{project.deployConfigErrors.join(' ')}</span>
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <label className="field">
+            <span className="label">Branch</span>
+            <input
+              value={projectForm.branch ?? ''}
+              onChange={(e) => setProjectForm((current) => ({ ...current, branch: e.target.value }))}
+            />
+          </label>
+          <label className="field">
+            <span className="label">Dockerfile</span>
+            <input
+              value={projectForm.dockerfilePath ?? ''}
+              onChange={(e) =>
+                setProjectForm((current) => ({
+                  ...current,
+                  dockerfilePath: e.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span className="label">Build Context</span>
+            <input
+              value={projectForm.buildContext ?? ''}
+              onChange={(e) =>
+                setProjectForm((current) => ({
+                  ...current,
+                  buildContext: e.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span className="label">Port</span>
+            <input
+              type="number"
+              value={projectForm.port ?? 3000}
+              onChange={(e) =>
+                setProjectForm((current) => ({
+                  ...current,
+                  port: Number(e.target.value),
+                }))
+              }
+            />
+          </label>
+          <label className="field">
+            <span className="label">Runtime</span>
+            <select
+              value={projectForm.runtimeType ?? 'web-server'}
+              onChange={(e) =>
+                setProjectForm((current) => ({
+                  ...current,
+                  runtimeType: e.target.value as Project['runtimeType'],
+                }))
+              }
+            >
+              <option value="web-server">App server</option>
+              <option value="static-site">Static site</option>
+            </select>
+          </label>
+          <label className="field">
+            <span className="label">Health Check Path</span>
+            <input
+              value={projectForm.healthCheckPath ?? '/'}
+              onChange={(e) =>
+                setProjectForm((current) => ({
+                  ...current,
+                  healthCheckPath: e.target.value,
+                }))
+              }
+            />
+          </label>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
+            Repo: <span className="mono">{project.githubRepositoryFullName ?? repoName(project.repoUrl)}</span>
+            {project.githubInstallationId ? (
+              <> · GitHub App installation <span className="mono">{project.githubInstallationId}</span></>
+            ) : null}
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={handleSaveSettings} disabled={savingSettings}>
+            {savingSettings ? <span className="spinner" /> : <Save size={12} strokeWidth={2} />}
+            Save Settings
+          </button>
+        </div>
+
+        <div>
+          <div className="section-label" style={{ marginBottom: 10 }}>
+            <Shield size={12} /> Environment
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns:
+                'repeat(auto-fit, minmax(160px, 1fr))',
+              gap: 8,
+              alignItems: 'end',
+              marginBottom: 12,
+            }}
+          >
+            <label className="field">
+              <span className="label">Key</span>
+              <input value={newEnvKey} onChange={(e) => setNewEnvKey(e.target.value.toUpperCase())} />
+            </label>
+            <label className="field">
+              <span className="label">{newEnvSecret ? 'Secret value' : 'Value'}</span>
+              <input value={newEnvValue} onChange={(e) => setNewEnvValue(e.target.value)} />
+            </label>
+            <label className="field" style={{ justifyContent: 'center' }}>
+              <span className="label">Secret</span>
+              <input
+                type="checkbox"
+                checked={newEnvSecret}
+                onChange={(e) => setNewEnvSecret(e.target.checked)}
+                style={{ width: 18, height: 18 }}
+              />
+            </label>
+            <button className="btn btn-primary btn-sm" onClick={handleAddEnvVar} type="button">
+              <Plus size={12} strokeWidth={2} />
+              Add
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: 8 }}>
+            {project.envVars.length === 0 ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: '.82rem' }}>
+                No environment variables yet.
+              </div>
+            ) : (
+              project.envVars.map((envVar) => (
+                <div
+                  key={envVar.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 10,
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div className="mono" style={{ fontWeight: 600 }}>
+                      {envVar.key}
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>
+                      {envVar.isSecret ? 'Secret' : 'Plain env'} · updated {timeAgo(envVar.updatedAt)}
+                    </div>
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => handleRemoveEnvVar(envVar.id)}
+                    type="button"
+                  >
+                    <X size={12} strokeWidth={2} />
+                    Remove
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {settingsMessage && (
+          <div style={{ marginTop: 14, color: 'var(--text-muted)', fontSize: '.82rem' }}>
+            {settingsMessage}
+          </div>
+        )}
       </div>
 
       {/* ── Deployments Split ────────────────────────────────────────────────── */}
