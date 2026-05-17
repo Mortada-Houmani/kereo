@@ -6,6 +6,7 @@ import { DeploymentsService } from './deployments.service';
 import { DeploymentsController } from './deployments.controller';
 import { ProjectsModule } from '../projects/projects.module';
 import { BullModule } from '@nestjs/bullmq';
+import { GithubModule } from '../github/github.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { BullModule } from '@nestjs/bullmq';
       name: 'deployments',
     }),
     ProjectsModule,
+    GithubModule,
   ],
   controllers: [DeploymentsController],
   providers: [DeploymentsService, DeploymentsProcessor],
