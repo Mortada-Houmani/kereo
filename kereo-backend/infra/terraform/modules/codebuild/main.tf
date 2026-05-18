@@ -98,11 +98,10 @@ resource "aws_codebuild_project" "this" {
               else
                 git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" source
               fi
-            - cd "source/$BUILD_CONTEXT"
             - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
         build:
           commands:
-            - docker build -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" --build-arg "APP_BASE_PATH=$APP_BASE_PATH" -f "$DOCKERFILE_PATH" .
+            - docker build -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" --build-arg "APP_BASE_PATH=$APP_BASE_PATH" -f "source/$DOCKERFILE_PATH" "source/$BUILD_CONTEXT"
         post_build:
           commands:
             - docker push "$IMAGE_URI"
