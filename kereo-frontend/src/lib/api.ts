@@ -83,6 +83,10 @@ export type DeploymentPhase =
   | 'failed';
 
 export type ProjectRuntimeType = 'web-server' | 'static-site';
+export type ProjectDatabaseMode =
+  | 'none'
+  | 'managed-postgres'
+  | 'external-database-url';
 
 export interface DeploymentSummary {
   id: string;
@@ -114,6 +118,7 @@ export interface Project {
   port: number;
   runtimeType: ProjectRuntimeType;
   healthCheckPath: string;
+  databaseMode: ProjectDatabaseMode;
   slug: string | null;
   ecsServiceName: string | null;
   ecsTaskFamily: string | null;
@@ -151,6 +156,8 @@ export interface CreateProjectDto {
   port?: number;
   runtimeType?: ProjectRuntimeType;
   healthCheckPath?: string;
+  databaseMode?: ProjectDatabaseMode;
+  externalDatabaseUrl?: string;
   githubInstallationId?: string;
   githubRepositoryId?: string;
   githubRepositoryFullName?: string;

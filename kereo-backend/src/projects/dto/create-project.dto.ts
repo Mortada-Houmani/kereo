@@ -7,7 +7,10 @@ import {
   Matches,
   Min,
 } from 'class-validator';
-import { ProjectRuntimeType } from '../entities/project.entity';
+import {
+  ProjectDatabaseMode,
+  ProjectRuntimeType,
+} from '../entities/project.entity';
 
 export class CreateProjectDto {
   @IsString()
@@ -45,6 +48,15 @@ export class CreateProjectDto {
   @IsOptional()
   @IsString()
   buildContext?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(Object.values(ProjectDatabaseMode))
+  databaseMode?: ProjectDatabaseMode;
+
+  @IsOptional()
+  @IsString()
+  externalDatabaseUrl?: string;
 
   @IsOptional()
   @IsString()

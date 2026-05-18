@@ -15,6 +15,7 @@ import {
   type CreateProjectDto,
   type GithubInstallation,
   type GithubRepository,
+  type ProjectDatabaseMode,
   type ProjectRuntimeType,
 } from '../lib/api';
 import './CreateProjectModal.css';
@@ -33,6 +34,7 @@ const defaults: CreateProjectDto = {
   port: 3000,
   runtimeType: 'web-server',
   healthCheckPath: '/',
+  databaseMode: 'managed-postgres',
 };
 
 const runtimeDefaults: Record<ProjectRuntimeType, number> = {
@@ -63,7 +65,7 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
 
   function set(
     key: keyof CreateProjectDto,
-    value: string | number | ProjectRuntimeType,
+    value: string | number | ProjectRuntimeType | ProjectDatabaseMode,
   ) {
     setForm(f => ({ ...f, [key]: value }));
   }
@@ -80,6 +82,11 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
         ...current,
         runtimeType,
         port: nextPort,
+        databaseMode:
+          runtimeType === 'static-site' &&
+          current.databaseMode === 'managed-postgres'
+            ? 'none'
+            : current.databaseMode,
       };
     });
   }
@@ -446,6 +453,35 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     disabled={loading}
                   />
                 </div>
+
+                <div className="field form-grid-span-2">
+                  <label className="label">Database</label>
+                  <select
+                    value={form.databaseMode ?? 'managed-postgres'}
+                    onChange={(e) => set('databaseMode', e.target.value as ProjectDatabaseMode)}
+                    disabled={loading}
+                  >
+                    <option value="none">No database</option>
+                    <option value="managed-postgres">Managed Postgres</option>
+                    <option value="external-database-url">Existing DATABASE_URL</option>
+                  </select>
+                  <span className="field-hint">
+                    Frontends usually want no database. Use existing DATABASE_URL if your app already has one.
+                  </span>
+                </div>
+
+                {form.databaseMode === 'external-database-url' && (
+                  <div className="field form-grid-span-2">
+                    <label className="label" htmlFor="proj-external-db">External DATABASE_URL</label>
+                    <input
+                      id="proj-external-db"
+                      value={form.externalDatabaseUrl ?? ''}
+                      onChange={(e) => set('externalDatabaseUrl', e.target.value)}
+                      placeholder="postgresql://user:pass@host:5432/db"
+                      disabled={loading}
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -453,7 +489,12 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
             <div className="modal-warning">
               <AlertTriangle size={14} style={{ color: 'var(--yellow)', flexShrink: 0 }} />
               <p>
-                Kereo will provision an ECS Service, CloudWatch logs, and an RDS database. 
+                Kereo will provision an ECS service and CloudWatch logs.
+                {form.databaseMode === 'managed-postgres'
+                  ? ' It will also create a managed Postgres database for this project.'
+                  : form.databaseMode === 'external-database-url'
+                    ? ' It will inject your external DATABASE_URL as a secret.'
+                    : ' No database will be created for this project.'}
                 Initial setup takes about 20s.
               </p>
             </div>

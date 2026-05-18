@@ -6,7 +6,10 @@ import {
   Matches,
   Min,
 } from 'class-validator';
-import { ProjectRuntimeType } from '../entities/project.entity';
+import {
+  ProjectDatabaseMode,
+  ProjectRuntimeType,
+} from '../entities/project.entity';
 
 export class UpdateProjectDto {
   @IsString()
@@ -43,6 +46,14 @@ export class UpdateProjectDto {
   })
   @IsOptional()
   healthCheckPath?: string;
+
+  @IsIn(Object.values(ProjectDatabaseMode))
+  @IsOptional()
+  databaseMode?: ProjectDatabaseMode;
+
+  @IsString()
+  @IsOptional()
+  externalDatabaseUrl?: string;
 
   @IsOptional()
   githubInstallationId?: string | null;

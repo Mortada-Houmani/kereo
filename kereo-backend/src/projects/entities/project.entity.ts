@@ -16,6 +16,12 @@ export enum ProjectRuntimeType {
   STATIC_SITE = 'static-site',
 }
 
+export enum ProjectDatabaseMode {
+  NONE = 'none',
+  MANAGED_POSTGRES = 'managed-postgres',
+  EXTERNAL_DATABASE_URL = 'external-database-url',
+}
+
 @Entity('projects')
 export class Project {
   @PrimaryGeneratedColumn('uuid')
@@ -47,6 +53,12 @@ export class Project {
 
   @Column({ default: '/' })
   healthCheckPath: string;
+
+  @Column({
+    type: 'varchar',
+    default: ProjectDatabaseMode.MANAGED_POSTGRES,
+  })
+  databaseMode: ProjectDatabaseMode;
 
   @Column({ nullable: true })
   slug: string;

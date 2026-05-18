@@ -15,7 +15,10 @@ import { DeleteParameterCommand, SSMClient } from '@aws-sdk/client-ssm';
 import { Client } from 'pg';
 
 import { Project } from './entities/project.entity';
-import { ProjectRuntimeType } from './entities/project.entity';
+import {
+  ProjectDatabaseMode,
+  ProjectRuntimeType,
+} from './entities/project.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { UpsertProjectEnvVarDto } from './dto/upsert-project-env-var.dto';
@@ -81,6 +84,11 @@ export class ProjectsService {
   async create(createProjectDto: CreateProjectDto, userId: string) {
     const runtimeType =
       createProjectDto.runtimeType ?? ProjectRuntimeType.WEB_SERVER;
+    const databaseMode =
+      createProjectDto.databaseMode ??
+      (runtimeType === ProjectRuntimeType.STATIC_SITE
+        ? ProjectDatabaseMode.NONE
+        : ProjectDatabaseMode.MANAGED_POSTGRES);
     const healthCheckPath = createProjectDto.healthCheckPath ?? '/';
     const port =
       createProjectDto.port ??
@@ -107,6 +115,7 @@ export class ProjectsService {
       branch:
         createProjectDto.branch ?? repoBinding.githubDefaultBranch ?? 'main',
       runtimeType,
+      databaseMode,
       healthCheckPath,
       port,
       slug,
@@ -122,6 +131,10 @@ export class ProjectsService {
     });
 
     const savedProject = await this.projectsRepository.save(project);
+    await this.syncExternalDatabaseUrl(savedProject, {
+      databaseMode,
+      externalDatabaseUrl: createProjectDto.externalDatabaseUrl,
+    });
 
     try {
       const provisioningResult =
@@ -201,6 +214,10 @@ export class ProjectsService {
       project.runtimeType = updateProjectDto.runtimeType;
     }
 
+    if (updateProjectDto.databaseMode !== undefined) {
+      project.databaseMode = updateProjectDto.databaseMode;
+    }
+
     if (updateProjectDto.name !== undefined) {
       project.name = updateProjectDto.name;
     }
@@ -232,6 +249,10 @@ export class ProjectsService {
     project.githubDefaultBranch = repoBinding.githubDefaultBranch;
 
     const savedProject = await this.projectsRepository.save(project);
+    await this.syncExternalDatabaseUrl(savedProject, {
+      databaseMode: project.databaseMode,
+      externalDatabaseUrl: updateProjectDto.externalDatabaseUrl,
+    });
     const hydratedProject = await this.findOwnedProjectEntity(
       savedProject.id,
       userId,
@@ -406,7 +427,10 @@ export class ProjectsService {
       project.slug,
       project.id,
     );
-    const parameterNames = [this.buildProjectDatabaseParamName(project.id)];
+    const parameterNames =
+      project.databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES
+        ? [this.buildProjectDatabaseParamName(project.id)]
+        : [];
     const logGroupName = `/ecs/${project.slug}`;
 
     const envVars = await this.projectEnvVarsRepository.find({
@@ -423,7 +447,9 @@ export class ProjectsService {
         ),
     );
 
-    await this.dropProjectDatabase(coreDatabaseUrl, databaseName);
+    if (project.databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES) {
+      await this.dropProjectDatabase(coreDatabaseUrl, databaseName);
+    }
     for (const parameterName of parameterNames) {
       await this.deleteProjectDatabaseParameter(awsRegion, parameterName);
     }
@@ -641,6 +667,17 @@ export class ProjectsService {
     }
 
     if (
+      project.databaseMode === ProjectDatabaseMode.EXTERNAL_DATABASE_URL &&
+      !(project.envVars ?? []).some(
+        (envVar) => envVar.key === 'DATABASE_URL' && envVar.isSecret,
+      )
+    ) {
+      errors.push(
+        'External database mode requires a secret DATABASE_URL environment variable.',
+      );
+    }
+
+    if (
       project.githubInstallationId &&
       (!project.githubRepositoryFullName || !project.githubRepositoryId)
     ) {
@@ -722,6 +759,60 @@ export class ProjectsService {
       throw new ForbiddenException(
         'You do not have access to the selected GitHub repository',
       );
+    }
+  }
+
+  private async syncExternalDatabaseUrl(
+    project: Project,
+    input: {
+      databaseMode: ProjectDatabaseMode;
+      externalDatabaseUrl?: string;
+    },
+  ) {
+    const existingDatabaseUrlEnv = await this.projectEnvVarsRepository.findOne({
+      where: {
+        project: { id: project.id },
+        key: 'DATABASE_URL',
+      },
+    });
+
+    if (input.databaseMode === ProjectDatabaseMode.EXTERNAL_DATABASE_URL) {
+      if (input.externalDatabaseUrl) {
+        const envVar =
+          existingDatabaseUrlEnv ??
+          this.projectEnvVarsRepository.create({
+            key: 'DATABASE_URL',
+            value: input.externalDatabaseUrl,
+            isSecret: true,
+            project,
+          });
+
+        envVar.key = 'DATABASE_URL';
+        envVar.value = input.externalDatabaseUrl;
+        envVar.isSecret = true;
+        envVar.project = project;
+        await this.projectEnvVarsRepository.save(envVar);
+        return;
+      }
+
+      if (!existingDatabaseUrlEnv) {
+        throw new ForbiddenException(
+          'External database mode requires an external database URL',
+        );
+      }
+
+      existingDatabaseUrlEnv.key = 'DATABASE_URL';
+      existingDatabaseUrlEnv.isSecret = true;
+      await this.projectEnvVarsRepository.save(existingDatabaseUrlEnv);
+      return;
+    }
+
+    if (
+      existingDatabaseUrlEnv &&
+      existingDatabaseUrlEnv.isSecret &&
+      existingDatabaseUrlEnv.key === 'DATABASE_URL'
+    ) {
+      await this.projectEnvVarsRepository.remove(existingDatabaseUrlEnv);
     }
   }
 

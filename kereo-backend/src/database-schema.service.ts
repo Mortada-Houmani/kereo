@@ -11,6 +11,7 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     await this.ensureDeploymentDashboardColumns();
     await this.ensureProjectRuntimeColumns();
     await this.ensureProjectGithubColumns();
+    await this.ensureProjectDatabaseColumns();
     await this.ensureProjectEnvVarTable();
     await this.ensureUserAuthColumns();
   }
@@ -56,6 +57,20 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
     `);
 
     this.logger.log('Project GitHub schema is ready');
+  }
+
+  private async ensureProjectDatabaseColumns() {
+    await this.dataSource.query(`
+      ALTER TABLE projects
+        ADD COLUMN IF NOT EXISTS "databaseMode" varchar NOT NULL DEFAULT 'managed-postgres'
+    `);
+
+    await this.dataSource.query(`
+      UPDATE projects
+      SET "databaseMode" = COALESCE(NULLIF("databaseMode", ''), 'managed-postgres')
+    `);
+
+    this.logger.log('Project database schema is ready');
   }
 
   private async ensureProjectEnvVarTable() {

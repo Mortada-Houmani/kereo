@@ -15,6 +15,7 @@ import {
   projectsApi,
   deploymentsApi,
   type Project,
+  type ProjectDatabaseMode,
   type DeploymentSummary,
   type UpdateProjectDto,
 } from '../lib/api';
@@ -44,6 +45,7 @@ export function ProjectDetailPage() {
   const [newEnvSecret, setNewEnvSecret] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);
+  const [externalDatabaseUrl, setExternalDatabaseUrl] = useState('');
   const [projectForm, setProjectForm] = useState<UpdateProjectDto>({
     branch: '',
     dockerfilePath: '',
@@ -51,6 +53,7 @@ export function ProjectDetailPage() {
     port: 3000,
     runtimeType: 'web-server',
     healthCheckPath: '/',
+    databaseMode: 'managed-postgres',
   });
 
   const load = useCallback(async (silent = false) => {
@@ -68,6 +71,7 @@ export function ProjectDetailPage() {
         port: res.data.port,
         runtimeType: res.data.runtimeType,
         healthCheckPath: res.data.healthCheckPath,
+        databaseMode: res.data.databaseMode,
       });
       setSelectedDep(prev =>
         prev
@@ -175,13 +179,24 @@ export function ProjectDetailPage() {
   const latestDep = project.latestDeployment;
   const isActive = latestDep && !latestDep.isTerminal;
 
-  async function handleSaveSettings() {
+  async function handleSaveSettings(override?: UpdateProjectDto) {
     if (!id) return;
     setSavingSettings(true);
     setSettingsMessage('');
     try {
-      const res = await projectsApi.update(id, projectForm);
+      const payload = override ?? projectForm;
+      const res = await projectsApi.update(id, payload);
       setProject(res.data);
+      setProjectForm({
+        name: res.data.name,
+        branch: res.data.branch,
+        dockerfilePath: res.data.dockerfilePath,
+        buildContext: res.data.buildContext,
+        port: res.data.port,
+        runtimeType: res.data.runtimeType,
+        healthCheckPath: res.data.healthCheckPath,
+        databaseMode: res.data.databaseMode,
+      });
       setSettingsMessage('Settings saved. Redeploy to apply runtime changes.');
     } catch {
       setSettingsMessage('Failed to save project settings.');
@@ -317,6 +332,16 @@ export function ProjectDetailPage() {
             <span className="detail-tile-label"><Server size={11} /> Runtime</span>
             <span className="detail-tile-value">
               {project.runtimeType === 'static-site' ? 'Static site' : 'App server'}
+            </span>
+          </div>
+          <div className="detail-info-tile">
+            <span className="detail-tile-label"><Database size={11} /> Database mode</span>
+            <span className="detail-tile-value">
+              {project.databaseMode === 'none'
+                ? 'No database'
+                : project.databaseMode === 'external-database-url'
+                  ? 'Existing DATABASE_URL'
+                  : 'Managed Postgres'}
             </span>
           </div>
           <div className="detail-info-tile">
@@ -476,7 +501,10 @@ export function ProjectDetailPage() {
               Delete this project
             </div>
             <div className="danger-zone-desc">
-              Removes the ECS service, target group, CloudWatch log group, SSM parameter, and RDS database.
+              Removes the ECS service, target group, CloudWatch log group, and project secrets.
+              {project.databaseMode === 'managed-postgres'
+                ? ' It also deletes the managed Postgres database for this project.'
+                : ''}
               This action <strong>cannot be undone</strong>.
             </div>
           </div>
@@ -528,7 +556,10 @@ export function ProjectDetailPage() {
                 <h3>Delete project?</h3>
                 <p>
                   <strong>{project.name}</strong> will be removed along with its ECS service,
-                  target group, CloudWatch logs, SSM parameter, and project database.
+                  target group, CloudWatch logs, and project secrets.
+                  {project.databaseMode === 'managed-postgres'
+                    ? ' The managed project database will be deleted too.'
+                    : ''}
                 </p>
               </div>
             </div>
@@ -626,6 +657,27 @@ export function ProjectDetailPage() {
                   onChange={(e) => setProjectForm((current) => ({ ...current, healthCheckPath: e.target.value }))}
                 />
               </label>
+              <label className="field">
+                <span className="label">Database Mode</span>
+                <select
+                  value={projectForm.databaseMode ?? 'managed-postgres'}
+                  onChange={(e) => setProjectForm((current) => ({ ...current, databaseMode: e.target.value as ProjectDatabaseMode }))}
+                >
+                  <option value="none">No database</option>
+                  <option value="managed-postgres">Managed Postgres</option>
+                  <option value="external-database-url">Existing DATABASE_URL</option>
+                </select>
+              </label>
+              {projectForm.databaseMode === 'external-database-url' ? (
+                <label className="field">
+                  <span className="label">External DATABASE_URL</span>
+                  <input
+                    value={externalDatabaseUrl}
+                    onChange={(e) => setExternalDatabaseUrl(e.target.value)}
+                    placeholder="Leave blank to keep current secret"
+                  />
+                </label>
+              ) : null}
               <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
                 Repo: <span className="mono">{project.githubRepositoryFullName ?? repoName(project.repoUrl)}</span>
                 {project.githubInstallationId ? (
@@ -640,8 +692,13 @@ export function ProjectDetailPage() {
               <button
                 className="btn btn-primary btn-sm"
                 onClick={async () => {
-                  await handleSaveSettings();
+                  await handleSaveSettings(
+                    projectForm.databaseMode === 'external-database-url' && externalDatabaseUrl
+                      ? { ...projectForm, externalDatabaseUrl }
+                      : projectForm,
+                  );
                   setShowEditModal(false);
+                  setExternalDatabaseUrl('');
                 }}
                 disabled={savingSettings}
               >

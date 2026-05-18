@@ -31,6 +31,7 @@ import {
 } from '../entities/deployment.entity';
 import { GithubService } from '../../github/github.service';
 import { ProjectsService } from '../../projects/projects.service';
+import { ProjectDatabaseMode } from '../../projects/entities/project.entity';
 
 @Injectable()
 @Processor('deployments', {
@@ -72,6 +73,8 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
     const dockerfilePath = deployment.project.dockerfilePath ?? 'Dockerfile';
     const buildContext = deployment.project.buildContext ?? '.';
     const port = deployment.project.port ?? 3000;
+    const databaseMode =
+      deployment.project.databaseMode ?? ProjectDatabaseMode.MANAGED_POSTGRES;
 
     try {
       const awsRegion = process.env.AWS_REGION;
@@ -83,7 +86,10 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       const ecsSubnetIds = process.env.ECS_SUBNET_IDS;
       const fallbackEcsSecurityGroupId = process.env.ECS_SECURITY_GROUP_ID;
       const jwtSecretParamArn = this.getRequiredJwtSecretParamArn();
-      const coreDatabaseUrl = this.getRequiredCoreDatabaseUrl();
+      const coreDatabaseUrl =
+        databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES
+          ? this.getRequiredCoreDatabaseUrl()
+          : null;
 
       const missingEcrVariables = [
         ['AWS_REGION', awsRegion],
@@ -133,7 +139,6 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         .map((securityGroupId) => securityGroupId.trim())
         .filter(Boolean);
       const resolvedJwtSecretParamArn = jwtSecretParamArn;
-      const resolvedCoreDatabaseUrl = coreDatabaseUrl;
 
       if (
         resolvedEcsSubnetIds.length === 0 ||
@@ -174,25 +179,30 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         region: resolvedAwsRegion,
       });
       const ssmClient = new SSMClient({ region: resolvedAwsRegion });
-      const projectDatabaseName = this.buildProjectDatabaseName(
-        projectSlug,
-        deployment.project.id,
-      );
-      const projectDatabaseUrl = this.buildProjectDatabaseUrl(
-        resolvedCoreDatabaseUrl,
-        projectDatabaseName,
-      );
       const projectEnvVars = await this.projectsService.getProjectEnvVarValues(
         deployment.project.id,
       );
-      const projectDatabaseParamName = this.buildProjectDatabaseParamName(
-        deployment.project.id,
-      );
-      const projectDatabaseParamArn = this.buildParameterArn({
-        awsRegion: resolvedAwsRegion,
-        awsAccountId: resolvedAwsAccountId,
-        parameterName: projectDatabaseParamName,
-      });
+      const projectDatabaseName =
+        databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES
+          ? this.buildProjectDatabaseName(projectSlug, deployment.project.id)
+          : null;
+      const projectDatabaseUrl =
+        databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES && coreDatabaseUrl
+          ? this.buildProjectDatabaseUrl(coreDatabaseUrl, projectDatabaseName!)
+          : null;
+      const projectDatabaseParamName =
+        databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES
+          ? this.buildProjectDatabaseParamName(deployment.project.id)
+          : null;
+      const projectDatabaseParamArn =
+        databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES &&
+        projectDatabaseParamName
+          ? this.buildParameterArn({
+              awsRegion: resolvedAwsRegion,
+              awsAccountId: resolvedAwsAccountId,
+              parameterName: projectDatabaseParamName,
+            })
+          : null;
       const githubToken =
         deployment.project.githubInstallationId &&
         deployment.project.githubRepositoryFullName
@@ -225,6 +235,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             `Repository: ${deployment.project.repoUrl}`,
             `Branch: ${branch}`,
             `Runtime: ${deployment.project.runtimeType}`,
+            `Database mode: ${databaseMode}`,
             `Health check: ${deployment.project.healthCheckPath}`,
             `Build context: ${buildContext}`,
             `Dockerfile: ${dockerfilePath}`,
@@ -308,37 +319,74 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         `Image pushed to ECR successfully.\nImage: ${ecrImageTag}\n`,
       );
 
-      deployment.databaseName = projectDatabaseName;
-      await this.deploymentsRepository.save(deployment);
-      await this.appendLog(
-        deployment,
-        `Ensuring dedicated project database exists.\nDatabase name: ${projectDatabaseName}\n`,
-      );
-      await this.setPhase(
-        deployment,
-        DeploymentPhase.DATABASE,
-        'Creating database',
-      );
+      let resolvedDatabaseUrlParamArn: string | null = null;
 
-      await this.ensureProjectDatabase(
-        resolvedCoreDatabaseUrl,
-        projectDatabaseName,
-      );
+      if (databaseMode === ProjectDatabaseMode.MANAGED_POSTGRES) {
+        deployment.databaseName = projectDatabaseName;
+        await this.deploymentsRepository.save(deployment);
+        await this.appendLog(
+          deployment,
+          `Ensuring dedicated project database exists.\nDatabase name: ${projectDatabaseName}\n`,
+        );
+        await this.setPhase(
+          deployment,
+          DeploymentPhase.DATABASE,
+          'Creating database',
+        );
 
-      await this.setPhase(
-        deployment,
-        DeploymentPhase.SECRETS,
-        'Writing secrets',
-      );
-      await this.appendLog(
-        deployment,
-        `Storing project database URL in SSM.\nParameter: ${projectDatabaseParamName}\n`,
-      );
+        await this.ensureProjectDatabase(
+          coreDatabaseUrl!,
+          projectDatabaseName!,
+        );
 
-      await this.putProjectDatabaseUrlParameter(ssmClient, {
-        parameterName: projectDatabaseParamName,
-        databaseUrl: projectDatabaseUrl,
-      });
+        await this.setPhase(
+          deployment,
+          DeploymentPhase.SECRETS,
+          'Writing secrets',
+        );
+        await this.appendLog(
+          deployment,
+          `Storing project database URL in SSM.\nParameter: ${projectDatabaseParamName}\n`,
+        );
+
+        await this.putProjectDatabaseUrlParameter(ssmClient, {
+          parameterName: projectDatabaseParamName!,
+          databaseUrl: projectDatabaseUrl!,
+        });
+        resolvedDatabaseUrlParamArn = projectDatabaseParamArn;
+      } else if (databaseMode === ProjectDatabaseMode.EXTERNAL_DATABASE_URL) {
+        const databaseUrlSecret = projectEnvVars.find(
+          (envVar) => envVar.key === 'DATABASE_URL' && envVar.isSecret,
+        );
+
+        if (!databaseUrlSecret?.value) {
+          throw new Error(
+            'External database mode requires a secret DATABASE_URL environment variable',
+          );
+        }
+
+        await this.setPhase(
+          deployment,
+          DeploymentPhase.SECRETS,
+          'Writing secrets',
+        );
+        await this.appendLog(
+          deployment,
+          'Using external DATABASE_URL secret provided in project environment variables.\n',
+        );
+      } else {
+        deployment.databaseName = null;
+        await this.deploymentsRepository.save(deployment);
+        await this.setPhase(
+          deployment,
+          DeploymentPhase.SECRETS,
+          'Preparing runtime config',
+        );
+        await this.appendLog(
+          deployment,
+          'Database provisioning disabled for this project.\n',
+        );
+      }
 
       await this.setPhase(
         deployment,
@@ -364,7 +412,11 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       );
       await this.appendLog(
         deployment,
-        `Using SSM Parameter Store secrets.\nDATABASE_URL parameter: ${projectDatabaseParamArn}\nJWT_SECRET parameter: ${resolvedJwtSecretParamArn}\n`,
+        `Using SSM Parameter Store secrets.\n${
+          resolvedDatabaseUrlParamArn
+            ? `DATABASE_URL parameter: ${resolvedDatabaseUrlParamArn}\n`
+            : 'DATABASE_URL parameter: not managed by Kereo\n'
+        }JWT_SECRET parameter: ${resolvedJwtSecretParamArn}\n`,
       );
 
       const secretEnvParams = await this.putProjectSecretParameters(ssmClient, {
@@ -378,7 +430,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         containerName: projectSlug,
         image: ecrImageTag,
         port,
-        databaseUrlParamArn: projectDatabaseParamArn,
+        databaseUrlParamArn: resolvedDatabaseUrlParamArn,
         jwtSecretParamArn: resolvedJwtSecretParamArn,
         awsRegion: resolvedAwsRegion,
         envVars: projectEnvVars
@@ -925,7 +977,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       containerName: string;
       image: string;
       port: number;
-      databaseUrlParamArn: string;
+      databaseUrlParamArn: string | null;
       jwtSecretParamArn: string;
       awsRegion: string;
       envVars: Array<{ name: string; value: string }>;
@@ -963,10 +1015,14 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
               ...input.envVars,
             ],
             secrets: [
-              {
-                name: 'DATABASE_URL',
-                valueFrom: input.databaseUrlParamArn,
-              },
+              ...(input.databaseUrlParamArn
+                ? [
+                    {
+                      name: 'DATABASE_URL',
+                      valueFrom: input.databaseUrlParamArn,
+                    },
+                  ]
+                : []),
               {
                 name: 'JWT_SECRET',
                 valueFrom: input.jwtSecretParamArn,
