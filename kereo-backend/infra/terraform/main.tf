@@ -22,9 +22,11 @@ module "ecr" {
 module "codebuild" {
   source = "./modules/codebuild"
 
-  project_name       = var.project_name
-  aws_region         = var.aws_region
-  ecr_repository_url = module.ecr.repository_url
+  project_name                   = var.project_name
+  aws_region                     = var.aws_region
+  ecr_repository_url             = module.ecr.repository_url
+  dockerhub_username             = var.dockerhub_username
+  dockerhub_token_parameter_name = length(aws_ssm_parameter.dockerhub_token) > 0 ? aws_ssm_parameter.dockerhub_token[0].name : null
 }
 
 module "ecs" {
@@ -122,6 +124,18 @@ resource "aws_ssm_parameter" "smtp_password" {
   name  = "/${var.project_name}/prod/SMTP_PASSWORD"
   type  = "SecureString"
   value = var.smtp_password
+
+  tags = {
+    Project = var.project_name
+  }
+}
+
+resource "aws_ssm_parameter" "dockerhub_token" {
+  count = length(trimspace(var.dockerhub_token)) > 0 ? 1 : 0
+
+  name  = "/${var.project_name}/prod/DOCKERHUB_TOKEN"
+  type  = "SecureString"
+  value = var.dockerhub_token
 
   tags = {
     Project = var.project_name

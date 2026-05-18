@@ -131,6 +131,17 @@ variable "smtp_from_name" {
   default = "Kereo"
 }
 
+variable "dockerhub_username" {
+  type    = string
+  default = ""
+}
+
+variable "dockerhub_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
 variable "container_image" {
   type = string
 }

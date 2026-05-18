@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
-  LayoutGrid, LogOut, ChevronRight, PlugZap,
+  LayoutGrid, LogOut, ChevronRight, PlugZap, BookOpenText,
 } from 'lucide-react';
 import { useAuth } from '../contexts/useAuth';
 import './Sidebar.css';
@@ -8,6 +8,7 @@ import './Sidebar.css';
 const nav = [
   { to: '/', icon: LayoutGrid, label: 'Projects' },
   { to: '/integrations', icon: PlugZap, label: 'Integrations' },
+  { to: '/docs', icon: BookOpenText, label: 'Docs' },
 ];
 
 export function Sidebar() {

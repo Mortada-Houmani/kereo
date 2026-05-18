@@ -8,7 +8,9 @@ import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { IntegrationsPage } from './pages/IntegrationsPage';
 import { GithubAuthCallbackPage } from './pages/GithubAuthCallbackPage';
 import { VerifyEmailPage } from './pages/VerifyEmailPage';
+import { DocsPage } from './pages/DocsPage';
 import './index.css';
+import './pages/DocsPage.css';
 
 export default function App() {
   return (
@@ -22,6 +24,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route index element={<ProjectsPage />} />
               <Route path="/integrations" element={<IntegrationsPage />} />
+              <Route path="/docs" element={<DocsPage />} />
               <Route path="/projects/:id" element={<ProjectDetailPage />} />
             </Route>
           </Route>

@@ -34,6 +34,8 @@ resource "aws_iam_role_policy" "codebuild" {
       {
         Effect = "Allow"
         Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
           "ecr:BatchCheckLayerAvailability",
           "ecr:CompleteLayerUpload",
           "ecr:GetAuthorizationToken",
@@ -72,6 +74,23 @@ resource "aws_codebuild_project" "this" {
       name  = "ECR_REPOSITORY_URL"
       value = var.ecr_repository_url
     }
+
+    dynamic "environment_variable" {
+      for_each = trimspace(var.dockerhub_username) != "" ? [var.dockerhub_username] : []
+      content {
+        name  = "DOCKERHUB_USERNAME"
+        value = environment_variable.value
+      }
+    }
+
+    dynamic "environment_variable" {
+      for_each = var.dockerhub_token_parameter_name != null ? [var.dockerhub_token_parameter_name] : []
+      content {
+        name  = "DOCKERHUB_TOKEN"
+        value = environment_variable.value
+        type  = "PARAMETER_STORE"
+      }
+    }
   }
 
   logs_config {
@@ -97,6 +116,12 @@ resource "aws_codebuild_project" "this" {
                 git clone --branch "$REPO_BRANCH" --single-branch "$AUTH_REPO_URL" source
               else
                 git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" source
+              fi
+            - |
+              if [ -n "$${DOCKERHUB_USERNAME:-}" ] && [ -n "$${DOCKERHUB_TOKEN:-}" ]; then
+                echo "$${DOCKERHUB_TOKEN}" | docker login --username "$${DOCKERHUB_USERNAME}" --password-stdin
+              else
+                echo "Docker Hub auth not configured; continuing with anonymous pulls."
               fi
             - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
         build:
