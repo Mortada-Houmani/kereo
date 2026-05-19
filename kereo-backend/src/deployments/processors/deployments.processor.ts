@@ -669,7 +669,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
     const databaseUrl = new URL(coreDatabaseUrl);
     databaseUrl.pathname = `/${databaseName}`;
     if (!databaseUrl.searchParams.has('sslmode')) {
-      databaseUrl.searchParams.set('sslmode', 'require');
+      databaseUrl.searchParams.set('sslmode', 'no-verify');
     }
 
     return databaseUrl.toString();

@@ -1,7 +1,7 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  database_url = "postgresql://${var.db_username}:${urlencode(var.db_password)}@${module.rds.db_endpoint}/${module.rds.db_name}?sslmode=require"
+  database_url = "postgresql://${var.db_username}:${urlencode(var.db_password)}@${module.rds.db_endpoint}/${module.rds.db_name}?sslmode=no-verify"
 }
 
 module "network" {
