@@ -3,19 +3,20 @@ import React, {
   useState,
   useCallback,
 } from 'react';
-import { authApi, type AuthUser } from '../lib/api';
+import { authApi, type AuthUser, type LoginResponse } from '../lib/api';
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResponse>;
   register: (
     email: string,
     password: string,
     confirmPassword: string,
-  ) => Promise<void>;
+  ) => Promise<LoginResponse>;
   setSession: (accessToken: string, user: AuthUser) => void;
+  updateUser: (updates: Partial<AuthUser>) => void;
   logout: () => void;
 }
 
@@ -61,10 +62,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const updateUser = useCallback((updates: Partial<AuthUser>) => {
+    setAuthState((current) => {
+      if (!current.user) {
+        return current;
+      }
+
+      const nextUser = {
+        ...current.user,
+        ...updates,
+      };
+
+      localStorage.setItem('kereo_user', JSON.stringify(nextUser));
+
+      return {
+        ...current,
+        user: nextUser,
+      };
+    });
+  }, []);
+
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
     const { accessToken, user: authUser } = res.data;
     setSession(accessToken, authUser);
+    return res.data;
   }, [setSession]);
 
   const register = useCallback(
@@ -72,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await authApi.register(email, password, confirmPassword);
       const { accessToken, user: authUser } = res.data;
       setSession(accessToken, authUser);
+      return res.data;
     },
     [setSession],
   );
@@ -86,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user: authState.user, token: authState.token, isLoading, login, register, setSession, logout }}>
+    <AuthContext.Provider value={{ user: authState.user, token: authState.token, isLoading, login, register, setSession, updateUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

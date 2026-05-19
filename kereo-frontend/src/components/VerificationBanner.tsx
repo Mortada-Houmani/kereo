@@ -22,8 +22,13 @@ export function VerificationBanner() {
     setSending(true);
     setMessage('');
     try {
-      await authApi.resendVerification(email);
-      setMessage('Verification email sent.');
+      const res = await authApi.resendVerification(email);
+      setMessage(
+        res.data.verificationEmailSent === false
+          ? res.data.verificationEmailError ||
+              'Account exists, but the verification email could not be sent yet.'
+          : 'Verification email sent.',
+      );
     } catch {
       setMessage('Failed to resend verification email.');
     } finally {

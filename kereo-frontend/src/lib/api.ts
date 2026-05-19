@@ -43,6 +43,14 @@ export interface AuthUser {
 export interface LoginResponse {
   accessToken: string;
   user: AuthUser;
+  verificationEmailSent?: boolean;
+  verificationEmailError?: string | null;
+}
+
+export interface ResendVerificationResponse {
+  success: true;
+  verificationEmailSent?: boolean;
+  verificationEmailError?: string | null;
 }
 
 export const authApi = {
@@ -57,7 +65,7 @@ export const authApi = {
   verifyEmail: (token: string) =>
     apiClient.post<{ success: true }>('/auth/verify-email', { token }),
   resendVerification: (email: string) =>
-    apiClient.post<{ success: true }>('/auth/resend-verification', { email }),
+    apiClient.post<ResendVerificationResponse>('/auth/resend-verification', { email }),
   getGithubAuthUrl: () =>
     apiClient.get<{ url: string }>('/auth/github/url'),
 };

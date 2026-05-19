@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../lib/api';
+import { useAuth } from '../contexts/useAuth';
 
 export function VerifyEmailPage() {
+  const { updateUser } = useAuth();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
@@ -20,6 +22,7 @@ export function VerifyEmailPage() {
     authApi
       .verifyEmail(token)
       .then(() => {
+        updateUser({ isEmailVerified: true });
         setStatus('success');
         setMessage('Email verified. You can continue using Kereo.');
       })
@@ -30,7 +33,7 @@ export function VerifyEmailPage() {
         setStatus('error');
         setMessage(Array.isArray(msg) ? msg[0] : String(msg));
       });
-  }, [token]);
+  }, [token, updateUser]);
 
   return (
     <div className="auth-page">

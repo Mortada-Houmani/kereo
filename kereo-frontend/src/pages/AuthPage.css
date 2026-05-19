@@ -107,3 +107,55 @@
 .auth-inline-action:hover {
   color: var(--accent);
 }
+
+@media (max-width: 640px) {
+  .auth-page {
+    align-items: stretch;
+    padding: 18px 14px;
+  }
+
+  .auth-card {
+    max-width: none;
+    min-height: auto;
+    padding: 28px 20px 24px;
+    border-radius: 18px;
+    margin: auto 0;
+  }
+
+  .auth-logo {
+    margin-bottom: 22px;
+    font-size: 1.02rem;
+  }
+
+  .auth-title {
+    font-size: 1.45rem;
+    margin-bottom: 6px;
+  }
+
+  .auth-subtitle {
+    font-size: 0.82rem;
+    margin-bottom: 22px;
+  }
+
+  .auth-github-btn {
+    margin-bottom: 14px;
+  }
+
+  .auth-separator {
+    margin-bottom: 16px;
+  }
+
+  .auth-form {
+    gap: 16px;
+  }
+
+  .auth-inline-action {
+    margin-top: 14px;
+    font-size: 0.76rem;
+  }
+
+  .auth-switch {
+    margin-top: 22px;
+    font-size: 0.76rem;
+  }
+}

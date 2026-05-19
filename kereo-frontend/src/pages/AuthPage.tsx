@@ -28,8 +28,13 @@ export function AuthPage() {
       if (mode === 'login') {
         await login(email, password);
       } else {
-        await register(email, password, confirmPassword);
-        setNotice('Account created. Check your inbox to verify your email.');
+        const res = await register(email, password, confirmPassword);
+        setNotice(
+          res.verificationEmailSent === false
+            ? res.verificationEmailError ||
+                'Account created, but the verification email could not be sent yet.'
+            : 'Account created. Check your inbox to verify your email.',
+        );
       }
     } catch (err: unknown) {
       const msg =
@@ -69,8 +74,13 @@ export function AuthPage() {
     setNotice('');
     setLoading(true);
     try {
-      await authApi.resendVerification(email);
-      setNotice('Verification email sent. Check your inbox.');
+      const res = await authApi.resendVerification(email);
+      setNotice(
+        res.data.verificationEmailSent === false
+          ? res.data.verificationEmailError ||
+              'Account exists, but the verification email could not be sent yet.'
+          : 'Verification email sent. Check your inbox.',
+      );
     } catch {
       setError('Failed to resend verification email');
     } finally {
