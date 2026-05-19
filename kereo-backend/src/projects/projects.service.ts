@@ -647,6 +647,7 @@ export class ProjectsService {
         key: true,
         value: true,
         isSecret: true,
+        exposeToBuild: true,
         createdAt: true,
         updatedAt: true,
       },

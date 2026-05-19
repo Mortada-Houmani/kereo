@@ -21,6 +21,7 @@ yarn-error.log*
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfplan
 crash.log
 override.tf
 override.tf.json
@@ -29,6 +30,7 @@ override.tf.json
 
 # terraform variable files
 *.auto.tfvars
+*.auto.tfvars.json
 terraform.tfvars
 
 # docker
