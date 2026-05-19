@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +19,8 @@ import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -45,14 +48,26 @@ export class AuthService {
       emailVerificationExpiresAt: verification.expiresAt,
     });
 
+    let verificationEmailSent = false;
+    let verificationEmailError: string | null = null;
+
     try {
       await this.sendVerificationEmail(user.email, verification.rawToken);
+      verificationEmailSent = true;
     } catch (error) {
-      await this.usersService.remove(user);
-      throw error;
+      verificationEmailError =
+        error instanceof Error
+          ? error.message
+          : 'Failed to send verification email';
+      this.logger.error(
+        `Verification email failed for ${user.email}: ${verificationEmailError}`,
+      );
     }
 
-    return this.issueAuthResponse(user);
+    return this.issueAuthResponse(user, {
+      verificationEmailSent,
+      verificationEmailError,
+    });
   }
 
   async login(loginDto: LoginDto) {
@@ -147,7 +162,13 @@ export class AuthService {
     return this.issueAuthResponse(user);
   }
 
-  private issueAuthResponse(user: User) {
+  private issueAuthResponse(
+    user: User,
+    options?: {
+      verificationEmailSent?: boolean;
+      verificationEmailError?: string | null;
+    },
+  ) {
     const payload = { sub: user.id, email: user.email };
     const accessToken = this.jwtService.sign(payload);
 
@@ -160,6 +181,9 @@ export class AuthService {
         githubLogin: user.githubLogin,
         githubAvatarUrl: user.githubAvatarUrl,
       },
+      verificationEmailSent:
+        options?.verificationEmailSent ?? user.isEmailVerified,
+      verificationEmailError: options?.verificationEmailError ?? null,
     };
   }
 
