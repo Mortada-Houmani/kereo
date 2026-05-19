@@ -59,6 +59,7 @@ type ProjectDashboard = Omit<Project, 'deployments' | 'envVars'> & {
     id: string;
     key: string;
     isSecret: boolean;
+    exposeToBuild: boolean;
     hasValue: boolean;
     updatedAt: Date;
   }>;
@@ -307,6 +308,10 @@ export class ProjectsService {
         key: input.key,
         value: input.value ?? '',
         isSecret: input.isSecret ?? false,
+        exposeToBuild:
+          input.exposeToBuild ??
+          (project.runtimeType === ProjectRuntimeType.STATIC_SITE &&
+            input.key.startsWith('VITE_')),
         project,
       });
     } else {
@@ -316,6 +321,14 @@ export class ProjectsService {
       }
       if (input.isSecret !== undefined) {
         envVar.isSecret = input.isSecret;
+      }
+      if (input.exposeToBuild !== undefined) {
+        envVar.exposeToBuild = input.exposeToBuild;
+      } else if (
+        project.runtimeType === ProjectRuntimeType.STATIC_SITE &&
+        envVar.key.startsWith('VITE_')
+      ) {
+        envVar.exposeToBuild = true;
       }
     }
 
@@ -612,6 +625,7 @@ export class ProjectsService {
           id: envVar.id,
           key: envVar.key,
           isSecret: envVar.isSecret,
+          exposeToBuild: envVar.exposeToBuild,
           hasValue: Boolean(envVar.value),
           updatedAt: envVar.updatedAt,
         })),

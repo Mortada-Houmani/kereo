@@ -82,10 +82,16 @@ export class DatabaseSchemaService implements OnApplicationBootstrap {
         key varchar NOT NULL,
         value text NOT NULL DEFAULT '',
         "isSecret" boolean NOT NULL DEFAULT false,
+        "exposeToBuild" boolean NOT NULL DEFAULT false,
         "projectId" uuid REFERENCES projects(id) ON DELETE CASCADE,
         "createdAt" timestamptz NOT NULL DEFAULT now(),
         "updatedAt" timestamptz NOT NULL DEFAULT now()
       )
+    `);
+
+    await this.dataSource.query(`
+      ALTER TABLE project_env_vars
+        ADD COLUMN IF NOT EXISTS "exposeToBuild" boolean NOT NULL DEFAULT false
     `);
 
     await this.dataSource.query(`

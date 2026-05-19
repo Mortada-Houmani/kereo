@@ -126,7 +126,12 @@ resource "aws_codebuild_project" "this" {
             - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
         build:
           commands:
-            - docker build -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" --build-arg "APP_BASE_PATH=$APP_BASE_PATH" -f "source/$DOCKERFILE_PATH" "source/$BUILD_CONTEXT"
+            - |
+              BUILD_ARGS=""
+              for key in $${DOCKER_BUILD_ARG_KEYS:-}; do
+                BUILD_ARGS="$${BUILD_ARGS} --build-arg $${key}"
+              done
+              eval docker build $${BUILD_ARGS} -t "$IMAGE_URI" --build-arg "PORT=$APP_PORT" --build-arg "APP_BASE_PATH=$APP_BASE_PATH" -f "source/$DOCKERFILE_PATH" "source/$BUILD_CONTEXT"
         post_build:
           commands:
             - docker push "$IMAGE_URI"

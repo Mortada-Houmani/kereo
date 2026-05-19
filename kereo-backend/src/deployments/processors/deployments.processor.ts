@@ -276,6 +276,7 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             port,
             appBasePath: '/',
             githubToken,
+            projectEnvVars,
           });
 
       if (!existingCodeBuildId) {
@@ -826,8 +827,18 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
       port: number;
       appBasePath: string;
       githubToken: string | null;
+      projectEnvVars: Array<{
+        key: string;
+        value: string;
+        isSecret: boolean;
+        exposeToBuild: boolean;
+      }>;
     },
   ) {
+    const buildEnvVars = input.projectEnvVars.filter(
+      (envVar) => envVar.exposeToBuild,
+    );
+    const buildArgKeys = buildEnvVars.map((envVar) => envVar.key).join(' ');
     const buildResult = await codebuildClient.send(
       new StartBuildCommand({
         projectName: input.projectName,
@@ -856,6 +867,16 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
             value: input.appBasePath,
             type: 'PLAINTEXT',
           },
+          {
+            name: 'DOCKER_BUILD_ARG_KEYS',
+            value: buildArgKeys,
+            type: 'PLAINTEXT',
+          },
+          ...buildEnvVars.map((envVar) => ({
+            name: envVar.key,
+            value: envVar.value,
+            type: 'PLAINTEXT' as const,
+          })),
           ...(input.githubToken
             ? [
                 {

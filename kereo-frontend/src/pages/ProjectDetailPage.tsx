@@ -43,6 +43,7 @@ export function ProjectDetailPage() {
   const [newEnvKey, setNewEnvKey] = useState('');
   const [newEnvValue, setNewEnvValue] = useState('');
   const [newEnvSecret, setNewEnvSecret] = useState(false);
+  const [newEnvExposeToBuild, setNewEnvExposeToBuild] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);
   const [externalDatabaseUrl, setExternalDatabaseUrl] = useState('');
@@ -213,6 +214,7 @@ export function ProjectDetailPage() {
         key: newEnvKey,
         value: newEnvValue,
         isSecret: newEnvSecret,
+        exposeToBuild: newEnvExposeToBuild,
       });
       setProject((current) =>
         current
@@ -226,6 +228,7 @@ export function ProjectDetailPage() {
       setNewEnvKey('');
       setNewEnvValue('');
       setNewEnvSecret(false);
+      setNewEnvExposeToBuild(false);
     } catch {
       setSettingsMessage('Failed to save environment variable.');
     }
@@ -430,7 +433,9 @@ export function ProjectDetailPage() {
                     {envVar.key}
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '.75rem' }}>
-                    {envVar.isSecret ? 'Secret' : 'Plain env'} · updated {timeAgo(envVar.updatedAt)}
+                    {envVar.isSecret ? 'Secret' : 'Plain env'}
+                    {envVar.exposeToBuild ? ' · build + runtime' : ' · runtime only'}
+                    {' '}· updated {timeAgo(envVar.updatedAt)}
                   </div>
                 </div>
                 <button
@@ -740,6 +745,19 @@ export function ProjectDetailPage() {
                   style={{ width: 18, height: 18 }}
                 />
               </label>
+              <label className="field">
+                <span className="label">Expose to build</span>
+                <input
+                  type="checkbox"
+                  checked={newEnvExposeToBuild}
+                  onChange={(e) => setNewEnvExposeToBuild(e.target.checked)}
+                  style={{ width: 18, height: 18 }}
+                />
+              </label>
+              <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
+                Turn this on for frontend build variables like <span className="mono">VITE_API_URL</span>.
+                Anything exposed at build time can be baked into shipped assets.
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost btn-sm" onClick={() => setShowEnvModal(false)}>

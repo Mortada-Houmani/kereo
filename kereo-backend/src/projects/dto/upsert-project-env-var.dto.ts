@@ -22,4 +22,8 @@ export class UpsertProjectEnvVarDto {
   @IsBoolean()
   @IsOptional()
   isSecret?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  exposeToBuild?: boolean;
 }

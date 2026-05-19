@@ -143,6 +143,7 @@ export interface ProjectEnvVar {
   id: string;
   key: string;
   isSecret: boolean;
+  exposeToBuild: boolean;
   hasValue: boolean;
   updatedAt: string;
 }
@@ -170,6 +171,7 @@ export interface UpsertProjectEnvVarDto {
   key: string;
   value?: string;
   isSecret?: boolean;
+  exposeToBuild?: boolean;
 }
 
 export interface GithubAppInfo {

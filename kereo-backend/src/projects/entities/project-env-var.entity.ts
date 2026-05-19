@@ -22,6 +22,9 @@ export class ProjectEnvVar {
   @Column({ default: false })
   isSecret: boolean;
 
+  @Column({ default: false })
+  exposeToBuild: boolean;
+
   @ManyToOne(() => Project, (project) => project.envVars, {
     onDelete: 'CASCADE',
   })
