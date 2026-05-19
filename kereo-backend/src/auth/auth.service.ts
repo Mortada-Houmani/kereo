@@ -111,16 +111,30 @@ export class AuthService {
     const user = await this.usersService.findByEmail(email);
 
     if (!user || user.isEmailVerified) {
-      return { success: true };
+      return { success: true, verificationEmailSent: false };
     }
 
     const verification = this.createEmailVerificationToken();
     user.emailVerificationTokenHash = verification.tokenHash;
     user.emailVerificationExpiresAt = verification.expiresAt;
     await this.usersService.save(user);
-    await this.sendVerificationEmail(user.email, verification.rawToken);
-
-    return { success: true };
+    try {
+      await this.sendVerificationEmail(user.email, verification.rawToken);
+      return { success: true, verificationEmailSent: true };
+    } catch (error) {
+      const verificationEmailError =
+        error instanceof Error
+          ? error.message
+          : 'Failed to send verification email';
+      this.logger.error(
+        `Resend verification email failed for ${user.email}: ${verificationEmailError}`,
+      );
+      return {
+        success: true,
+        verificationEmailSent: false,
+        verificationEmailError,
+      };
+    }
   }
 
   getGithubAuthUrl() {
