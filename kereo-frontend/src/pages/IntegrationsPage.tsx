@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ExternalLink, GitBranch, RefreshCw } from 'lucide-react';
+import { ExternalLink, GitBranch, RefreshCw, Copy, Check } from 'lucide-react';
 import {
   authApi,
   githubApi,
@@ -14,6 +14,7 @@ export function IntegrationsPage() {
   const [installations, setInstallations] = useState<GithubInstallation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [copiedValue, setCopiedValue] = useState('');
   const needsAppSetup = searchParams.get('setup') === 'app';
   const githubInstallationId = searchParams.get('installation_id');
   const githubSetupAction = searchParams.get('setup_action');
@@ -54,6 +55,18 @@ export function IntegrationsPage() {
     window.location.href = res.data.url;
   }
 
+  async function copyToClipboard(value: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedValue(key);
+      window.setTimeout(() => {
+        setCopiedValue((current) => (current === key ? '' : current));
+      }, 1200);
+    } catch {
+      setError('Copy failed');
+    }
+  }
+
   return (
     <div className="projects-page">
       <div className="page-header">
@@ -82,10 +95,20 @@ export function IntegrationsPage() {
             </div>
           </div>
           {connection?.installUrl ? (
-            <a className="btn btn-primary btn-sm" href={connection.installUrl} target="_blank" rel="noreferrer">
-              <ExternalLink size={12} strokeWidth={2} />
-              Grant Repository Access
-            </a>
+            <div className="modal-inline-actions">
+              <a className="btn btn-primary btn-sm" href={connection.installUrl} target="_blank" rel="noreferrer">
+                <ExternalLink size={12} strokeWidth={2} />
+                Grant Repository Access
+              </a>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => void copyToClipboard(connection.installUrl!, 'install-url')}
+              >
+                {copiedValue === 'install-url' ? <Check size={12} strokeWidth={2} /> : <Copy size={12} strokeWidth={2} />}
+                Copy Link
+              </button>
+            </div>
           ) : null}
         </div>
 

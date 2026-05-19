@@ -8,6 +8,8 @@ import {
   Server,
   AlertTriangle,
   Activity,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import {
   projectsApi,
@@ -68,6 +70,13 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
     value: string | number | ProjectRuntimeType | ProjectDatabaseMode,
   ) {
     setForm(f => ({ ...f, [key]: value }));
+  }
+
+  function bumpPort(delta: number) {
+    setForm((current) => ({
+      ...current,
+      port: Math.max(1, Number(current.port ?? 1) + delta),
+    }));
   }
 
   function setRuntimeType(runtimeType: ProjectRuntimeType) {
@@ -368,14 +377,35 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
                     <Server size={11} style={{ marginRight: 4 }} />
                     App Port
                   </label>
-                  <input
-                    id="proj-port"
-                    type="number"
-                    value={form.port}
-                    onChange={e => set('port', e.target.value)}
-                    placeholder="3000"
-                    disabled={loading}
-                  />
+                  <div className="number-stepper">
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => bumpPort(-1)}
+                      disabled={loading || Number(form.port ?? 3000) <= 1}
+                      aria-label="Decrease port"
+                    >
+                      <Minus size={14} strokeWidth={2} />
+                    </button>
+                    <input
+                      id="proj-port"
+                      className="number-stepper-input"
+                      type="number"
+                      value={form.port}
+                      onChange={e => set('port', Number(e.target.value))}
+                      placeholder="3000"
+                      disabled={loading}
+                    />
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => bumpPort(1)}
+                      disabled={loading}
+                      aria-label="Increase port"
+                    >
+                      <Plus size={14} strokeWidth={2} />
+                    </button>
+                  </div>
                   <span className="field-hint">
                     {form.runtimeType === 'static-site'
                       ? 'Static-site containers usually listen on port 80.'

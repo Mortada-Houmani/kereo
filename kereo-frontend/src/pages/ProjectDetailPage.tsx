@@ -10,6 +10,9 @@ import {
   Settings2,
   Plus,
   X,
+  Minus,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   projectsApi,
@@ -47,6 +50,7 @@ export function ProjectDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEnvModal, setShowEnvModal] = useState(false);
   const [externalDatabaseUrl, setExternalDatabaseUrl] = useState('');
+  const [copiedValue, setCopiedValue] = useState('');
   const [projectForm, setProjectForm] = useState<UpdateProjectDto>({
     branch: '',
     dockerfilePath: '',
@@ -253,6 +257,25 @@ export function ProjectDetailPage() {
     }
   }
 
+  function bumpPort(delta: number) {
+    setProjectForm((current) => ({
+      ...current,
+      port: Math.max(1, Number(current.port ?? 1) + delta),
+    }));
+  }
+
+  async function copyToClipboard(value: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedValue(key);
+      window.setTimeout(() => {
+        setCopiedValue((current) => (current === key ? '' : current));
+      }, 1200);
+    } catch {
+      setSettingsMessage('Copy failed.');
+    }
+  }
+
   return (
     <div className="detail-page fade-up">
       {/* Breadcrumb */}
@@ -320,7 +343,21 @@ export function ProjectDetailPage() {
             >
               <span className="detail-tile-label"><Globe size={11} /> Live URL</span>
               <span className="detail-tile-value">
-                {project.publicUrl.replace(/^https?:\/\//, '')}
+                <span className="detail-inline-actions">
+                  <span>{project.publicUrl.replace(/^https?:\/\//, '')}</span>
+                  <button
+                    type="button"
+                    className="detail-inline-copy"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void copyToClipboard(project.publicUrl!, 'live-url');
+                    }}
+                    aria-label="Copy live URL"
+                    title="Copy live URL"
+                  >
+                    {copiedValue === 'live-url' ? <Check size={11} /> : <Copy size={11} />}
+                  </button>
+                </span>
                 <ExternalLink size={10} strokeWidth={2} />
               </span>
             </a>
@@ -615,74 +652,100 @@ export function ProjectDetailPage() {
                 <X size={18} />
               </button>
             </div>
-            <div className="modal-body" style={{ display: 'grid', gap: 12 }}>
-              <label className="field">
-                <span className="label">Branch</span>
-                <input
-                  value={projectForm.branch ?? ''}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, branch: e.target.value }))}
-                />
-              </label>
-              <label className="field">
-                <span className="label">Dockerfile</span>
-                <input
-                  value={projectForm.dockerfilePath ?? ''}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, dockerfilePath: e.target.value }))}
-                />
-              </label>
-              <label className="field">
-                <span className="label">Build Context</span>
-                <input
-                  value={projectForm.buildContext ?? ''}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, buildContext: e.target.value }))}
-                />
-              </label>
-              <label className="field">
-                <span className="label">Port</span>
-                <input
-                  type="number"
-                  value={projectForm.port ?? 3000}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, port: Number(e.target.value) }))}
-                />
-              </label>
-              <label className="field">
-                <span className="label">Runtime</span>
-                <select
-                  value={projectForm.runtimeType ?? 'web-server'}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, runtimeType: e.target.value as Project['runtimeType'] }))}
-                >
-                  <option value="web-server">App server</option>
-                  <option value="static-site">Static site</option>
-                </select>
-              </label>
-              <label className="field">
-                <span className="label">Health Check Path</span>
-                <input
-                  value={projectForm.healthCheckPath ?? '/'}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, healthCheckPath: e.target.value }))}
-                />
-              </label>
-              <label className="field">
-                <span className="label">Database Mode</span>
-                <select
-                  value={projectForm.databaseMode ?? 'managed-postgres'}
-                  onChange={(e) => setProjectForm((current) => ({ ...current, databaseMode: e.target.value as ProjectDatabaseMode }))}
-                >
-                  <option value="none">No database</option>
-                  <option value="managed-postgres">Managed Postgres</option>
-                  <option value="external-database-url">Existing DATABASE_URL</option>
-                </select>
-              </label>
-              {projectForm.databaseMode === 'external-database-url' ? (
+            <div className="modal-body modal-stack">
+              <div className="modal-soft-panel">
                 <label className="field">
-                  <span className="label">External DATABASE_URL</span>
+                  <span className="label">Branch</span>
                   <input
-                    value={externalDatabaseUrl}
-                    onChange={(e) => setExternalDatabaseUrl(e.target.value)}
-                    placeholder="Leave blank to keep current secret"
+                    value={projectForm.branch ?? ''}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, branch: e.target.value }))}
                   />
                 </label>
-              ) : null}
+                <label className="field">
+                  <span className="label">Dockerfile</span>
+                  <input
+                    value={projectForm.dockerfilePath ?? ''}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, dockerfilePath: e.target.value }))}
+                  />
+                </label>
+                <label className="field">
+                  <span className="label">Build Context</span>
+                  <input
+                    value={projectForm.buildContext ?? ''}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, buildContext: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="modal-soft-panel">
+                <label className="field">
+                  <span className="label">Port</span>
+                  <div className="number-stepper">
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => bumpPort(-1)}
+                      disabled={Number(projectForm.port ?? 3000) <= 1}
+                      aria-label="Decrease port"
+                    >
+                      <Minus size={14} strokeWidth={2} />
+                    </button>
+                    <input
+                      className="number-stepper-input"
+                      type="number"
+                      value={projectForm.port ?? 3000}
+                      onChange={(e) => setProjectForm((current) => ({ ...current, port: Number(e.target.value) }))}
+                    />
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => bumpPort(1)}
+                      aria-label="Increase port"
+                    >
+                      <Plus size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                </label>
+                <label className="field">
+                  <span className="label">Runtime</span>
+                  <select
+                    value={projectForm.runtimeType ?? 'web-server'}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, runtimeType: e.target.value as Project['runtimeType'] }))}
+                  >
+                    <option value="web-server">App server</option>
+                    <option value="static-site">Static site</option>
+                  </select>
+                </label>
+                <label className="field">
+                  <span className="label">Health Check Path</span>
+                  <input
+                    value={projectForm.healthCheckPath ?? '/'}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, healthCheckPath: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="modal-soft-panel">
+                <label className="field">
+                  <span className="label">Database Mode</span>
+                  <select
+                    value={projectForm.databaseMode ?? 'managed-postgres'}
+                    onChange={(e) => setProjectForm((current) => ({ ...current, databaseMode: e.target.value as ProjectDatabaseMode }))}
+                  >
+                    <option value="none">No database</option>
+                    <option value="managed-postgres">Managed Postgres</option>
+                    <option value="external-database-url">Existing DATABASE_URL</option>
+                  </select>
+                </label>
+                {projectForm.databaseMode === 'external-database-url' ? (
+                  <label className="field">
+                    <span className="label">External DATABASE_URL</span>
+                    <input
+                      value={externalDatabaseUrl}
+                      onChange={(e) => setExternalDatabaseUrl(e.target.value)}
+                      placeholder="Leave blank to keep current secret"
+                    />
+                  </label>
+                ) : null}
+              </div>
               <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
                 Repo: <span className="mono">{project.githubRepositoryFullName ?? repoName(project.repoUrl)}</span>
                 {project.githubInstallationId ? (
@@ -738,21 +801,27 @@ export function ProjectDetailPage() {
               </label>
               <label className="field">
                 <span className="label">Secret</span>
-                <input
-                  type="checkbox"
-                  checked={newEnvSecret}
-                  onChange={(e) => setNewEnvSecret(e.target.checked)}
-                  style={{ width: 18, height: 18 }}
-                />
+                <span className="checkbox-row">
+                  <input
+                    className="checkbox-control"
+                    type="checkbox"
+                    checked={newEnvSecret}
+                    onChange={(e) => setNewEnvSecret(e.target.checked)}
+                  />
+                  <span>Keep this masked in the UI</span>
+                </span>
               </label>
               <label className="field">
                 <span className="label">Expose to build</span>
-                <input
-                  type="checkbox"
-                  checked={newEnvExposeToBuild}
-                  onChange={(e) => setNewEnvExposeToBuild(e.target.checked)}
-                  style={{ width: 18, height: 18 }}
-                />
+                <span className="checkbox-row">
+                  <input
+                    className="checkbox-control"
+                    type="checkbox"
+                    checked={newEnvExposeToBuild}
+                    onChange={(e) => setNewEnvExposeToBuild(e.target.checked)}
+                  />
+                  <span>Use this during Docker build</span>
+                </span>
               </label>
               <div style={{ color: 'var(--text-muted)', fontSize: '.8rem' }}>
                 Turn this on for frontend build variables like <span className="mono">VITE_API_URL</span>.

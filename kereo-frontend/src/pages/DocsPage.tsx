@@ -14,6 +14,9 @@ const dockerExamples = {
 
 WORKDIR /app
 
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -93,6 +96,7 @@ export function DocsPage() {
             <li><strong>Dockerfile path</strong> and <strong>Build context</strong> are both relative to the repo root.</li>
             <li><strong>Frontend env vars</strong> like <code>VITE_API_URL</code> must exist at build time.</li>
             <li><strong>Backend env vars</strong> are injected into the running container at deploy time.</li>
+            <li><strong>Managed Postgres</strong> injects a runtime <code>DATABASE_URL</code> for the deployed app.</li>
           </ul>
         </DocSection>
 
@@ -131,8 +135,18 @@ export function DocsPage() {
               <span>Kereo passes this into the Docker build and runtime. Your app should listen on it if needed.</span>
             </div>
           </div>
+          <div className="docs-callout">
+            <strong>Build-time vs runtime matters.</strong>
+            <span>
+              Static frontends like Vite read env vars while the image is being built. Backend apps usually read env vars
+              when the container starts. If a frontend env var is only present in the task definition, the built bundle
+              will ignore it.
+            </span>
+          </div>
           <ul className="docs-list">
             <li>Frontend static apps need env vars at build time, so redeploy after changing them.</li>
+            <li>For frontend vars like <code>VITE_API_URL</code>, turn on <strong>Expose to build</strong> in the project env var modal.</li>
+            <li>Your Dockerfile still needs to consume build args, for example <code>ARG VITE_API_URL</code> and <code>ENV VITE_API_URL=$VITE_API_URL</code>.</li>
             <li>If a URL env var misses <code>https://</code>, browsers treat it like a relative path.</li>
             <li>Use secret env vars for tokens, API keys, and external database URLs.</li>
           </ul>
@@ -157,6 +171,11 @@ export function DocsPage() {
           <p>
             Kereo provisions the database, but your app still needs to run migrations or create tables itself.
           </p>
+          <ul className="docs-list">
+            <li><strong>Managed Postgres</strong> is the easiest path when your app already reads <code>DATABASE_URL</code>.</li>
+            <li><strong>Existing DATABASE_URL</strong> is a good fit if you already have Neon, Supabase, RDS, or another hosted database.</li>
+            <li>If an app works with an external database but not managed Postgres, the first thing to verify is runtime env injection.</li>
+          </ul>
         </DocSection>
 
         <DocSection icon={GitBranch} title="GitHub setup">
@@ -198,6 +217,19 @@ export function DocsPage() {
             <li><strong>Docker Hub 429 rate limit:</strong> use public ECR base images, or configure Docker Hub auth in platform Terraform.</li>
             <li><strong>Frontend env change did nothing:</strong> redeploy the frontend so the bundle is rebuilt.</li>
             <li><strong>Managed Postgres app boots but tables are missing:</strong> your app still needs migrations.</li>
+          </ul>
+        </DocSection>
+
+        <DocSection icon={BookOpenText} title="Known platform notes">
+          <p>
+            Kereo already supports build-exposed frontend env vars and managed database injection, but it is still a young
+            platform and a few edges are worth knowing up front.
+          </p>
+          <ul className="docs-list">
+            <li><strong>Frontend envs are stricter than backend envs:</strong> if a Vite app ignores a value, check both <strong>Expose to build</strong> and the Dockerfile <code>ARG</code>/<code>ENV</code> lines.</li>
+            <li><strong>Managed Postgres depends on runtime env wiring:</strong> if the same app works with Neon or another external database, compare the live <code>DATABASE_URL</code> path before changing app code.</li>
+            <li><strong>Health checks should stay simple:</strong> use a route that does not depend on frontend routing or browser-only behavior.</li>
+            <li><strong>When in doubt, prove the path:</strong> test a static route first, then a DB-backed route, then inspect app logs.</li>
           </ul>
         </DocSection>
       </div>

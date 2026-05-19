@@ -63,6 +63,23 @@
   gap: 8px;
 }
 
+.docs-callout {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-dim) 58%, var(--bg-subtle));
+}
+
+.docs-callout strong {
+  color: var(--text-primary);
+}
+
+.docs-callout span {
+  color: var(--text-secondary);
+}
+
 .docs-table-row {
   display: grid;
   grid-template-columns: minmax(180px, 220px) 1fr;

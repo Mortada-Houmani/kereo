@@ -74,6 +74,10 @@
   gap: 28px;
 }
 
+.modal-body .field {
+  gap: 7px;
+}
+
 .form-section {
   display: flex;
   flex-direction: column;
@@ -162,6 +166,12 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.modal-inline-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 500px) {

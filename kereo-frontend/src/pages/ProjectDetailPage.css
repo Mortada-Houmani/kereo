@@ -109,6 +109,47 @@
   text-overflow: ellipsis;
 }
 
+.detail-inline-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.detail-inline-copy {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--text-muted);
+  transition: background .12s, color .12s;
+}
+
+.detail-inline-copy:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.modal-soft-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.modal-soft-panel .label {
+  margin-bottom: 0;
+}
+
 /* ── Split Layout ──────────────────────────────────────────────────────────── */
 .detail-split {
   display: grid;
