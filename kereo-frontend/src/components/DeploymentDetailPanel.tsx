@@ -7,7 +7,14 @@ import {
 import type { DeploymentSummary, DeploymentDetail } from '../lib/api';
 import { deploymentsApi } from '../lib/api';
 import { StatusBadge } from './StatusBadge';
-import { getPhaseMeta, formatDuration, shortSha, timeAgo, errorSummary } from '../lib/utils';
+import {
+  getPhaseMeta,
+  formatDuration,
+  shortSha,
+  timeAgo,
+  errorSummary,
+  errorRecommendation,
+} from '../lib/utils';
 import './DeploymentDetailPanel.css';
 
 const PHASES = ['queued', 'build', 'database', 'secrets', 'logging', 'ecs', 'live'] as const;
@@ -44,6 +51,7 @@ export function DeploymentDetailPanel({ dep }: Props) {
 
   const currentPhaseStep = getPhaseMeta(dep.phase).step;
   const errSummary = errorSummary(dep.errorMessage);
+  const errRecommendation = errorRecommendation(dep.errorMessage);
 
   return (
     <div className="dep-detail-panel scale-in">
@@ -109,6 +117,11 @@ export function DeploymentDetailPanel({ dep }: Props) {
           <div className="failure-summary-content">
             <div className="failure-summary-title">Deployment failed</div>
             <p className="failure-summary-text">{errSummary}</p>
+            {errRecommendation ? (
+              <p className="failure-summary-text" style={{ marginTop: 8 }}>
+                <strong>Suggested fix:</strong> {errRecommendation.replace(/^What to do next:\s*/i, '')}
+              </p>
+            ) : null}
           </div>
         </div>
       )}

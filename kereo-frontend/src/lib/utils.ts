@@ -69,3 +69,12 @@ export function errorSummary(raw: string | null) {
   const lines = raw.split('\n').filter(l => l.trim());
   return lines[0] ?? null;
 }
+
+export function errorRecommendation(raw: string | null) {
+  if (!raw) return null;
+  const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean);
+  const recommendation = lines.find((line) =>
+    line.toLowerCase().startsWith('what to do next:'),
+  );
+  return recommendation ?? null;
+}

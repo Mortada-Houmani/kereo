@@ -553,14 +553,15 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
         liveUrl,
       };
     } catch (error) {
-      const message =
+      const rawMessage =
         error instanceof Error ? error.message : 'Unknown deployment error';
+      const message = this.formatDeploymentErrorMessage(rawMessage);
 
       deployment.status = DeploymentStatus.FAILED;
       deployment.phase = DeploymentPhase.FAILED;
       deployment.phaseLabel = 'Failed';
       deployment.errorMessage = message;
-      deployment.logs = `${deployment.logs ?? ''}\nDeployment failed:\n${message}\n`;
+      deployment.logs = `${deployment.logs ?? ''}\nDeployment failed:\n${message}\n\nRaw error:\n${rawMessage}\n`;
 
       await this.deploymentsRepository.save(deployment);
 
@@ -615,6 +616,79 @@ export class DeploymentsProcessor extends WorkerHost implements OnModuleInit {
   private async appendLog(deployment: Deployment, log: string) {
     deployment.logs = `${deployment.logs ?? ''}${log}`;
     await this.deploymentsRepository.save(deployment);
+  }
+
+  private formatDeploymentErrorMessage(rawMessage: string) {
+    const message = rawMessage.trim();
+    const lower = message.toLowerCase();
+
+    if (
+      lower.includes('targetgroupnotfound') ||
+      (lower.includes('target group') && lower.includes('not found'))
+    ) {
+      return [
+        'The project load balancer resources are no longer available.',
+        'What to do next: recreate this project so Kereo can provision a fresh target group and listener rule.',
+      ].join('\n');
+    }
+
+    if (
+      lower.includes('duplicatetargetgroupname') ||
+      lower.includes('priorityinuse') ||
+      lower.includes('already exists') ||
+      (lower.includes('listener rule') && lower.includes('conflict'))
+    ) {
+      return [
+        'AWS reported a provisioning conflict while creating load balancer resources.',
+        'What to do next: delete and recreate the project. This usually clears stale target group or listener rule conflicts.',
+      ].join('\n');
+    }
+
+    if (lower.includes('codebuild failed with status')) {
+      return [
+        'The container image build failed in CodeBuild.',
+        'What to do next: open the deployment logs and inspect the docker build output. The most common fixes are correcting the Dockerfile path, build context, or app build command.',
+      ].join('\n');
+    }
+
+    if (
+      (lower.includes('dockerfile') && lower.includes('no such file')) ||
+      lower.includes('failed to read dockerfile')
+    ) {
+      return [
+        'Kereo could not find the Dockerfile for this project.',
+        'What to do next: check the Dockerfile path and build context in project settings. Both paths are relative to the repository root.',
+      ].join('\n');
+    }
+
+    if (
+      lower.includes('self-signed certificate') ||
+      (lower.includes('ssl') && lower.includes('database'))
+    ) {
+      return [
+        'The app could not complete the database SSL handshake.',
+        'What to do next: verify the DATABASE_URL or managed Postgres configuration, then redeploy the app so the task gets a fresh connection string.',
+      ].join('\n');
+    }
+
+    if (lower.includes('missing project aws metadata')) {
+      return [
+        'This project is missing required AWS resource metadata.',
+        'What to do next: recreate the project. Kereo needs a fresh ECS service, target group, and listener rule binding for deployments to work.',
+      ].join('\n');
+    }
+
+    if (lower.includes('missing aws provisioning environment variables')) {
+      return [
+        'Kereo is missing required AWS platform configuration.',
+        'What to do next: check the platform Terraform and ECS runtime variables for ALB, VPC, or ECS settings before retrying the deployment.',
+      ].join('\n');
+    }
+
+    return [
+      message,
+      'What to do next: review the deployment logs for the raw error and retry after updating the relevant project or platform configuration.',
+    ].join('\n');
   }
 
   private getRequiredJwtSecretParamArn() {
