@@ -46,6 +46,9 @@ const runtimeDefaults: Record<ProjectRuntimeType, number> = {
 
 export function CreateProjectModal({ onClose, onCreated }: Props) {
   const [form, setForm] = useState<CreateProjectDto>(defaults);
+  const [repositoryMode, setRepositoryMode] = useState<'github' | 'manual'>(
+    'github',
+  );
   const [loading, setLoading] = useState(false);
   const [loadingGithub, setLoadingGithub] = useState(true);
   const [error, setError] = useState('');
@@ -64,6 +67,7 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
   );
   const needsRepositoryAccess =
     githubConnected && !loadingGithub && installations.length === 0;
+  const usingGithubRepository = repositoryMode === 'github';
 
   function set(
     key: keyof CreateProjectDto,
@@ -186,7 +190,21 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
       await projectsApi.create({
         ...form,
         port: Number(form.port),
-        repoUrl: selectedRepository?.repoUrl ?? form.repoUrl,
+        repoUrl: usingGithubRepository
+          ? selectedRepository?.repoUrl ?? form.repoUrl
+          : form.repoUrl,
+        githubInstallationId: usingGithubRepository
+          ? form.githubInstallationId
+          : undefined,
+        githubRepositoryId: usingGithubRepository
+          ? form.githubRepositoryId
+          : undefined,
+        githubRepositoryFullName: usingGithubRepository
+          ? form.githubRepositoryFullName
+          : undefined,
+        githubDefaultBranch: usingGithubRepository
+          ? form.githubDefaultBranch
+          : undefined,
       });
       onCreated();
     } catch (err: unknown) {
@@ -235,111 +253,156 @@ export function CreateProjectModal({ onClose, onCreated }: Props) {
             {/* Repository Info */}
             <div className="form-section">
               <span className="section-label">Repository Configuration</span>
-              <div className="form-grid">
-                <div className="field">
-                  <label className="label" htmlFor="proj-installation">
-                    <Globe size={11} style={{ marginRight: 4 }} />
-                    GitHub Installation
-                  </label>
-                  <select
-                    id="proj-installation"
-                    value={form.githubInstallationId ?? ''}
-                    onChange={e => {
-                      const installationId = e.target.value || undefined;
-                      setForm((current) => ({
-                        ...current,
-                        githubInstallationId: installationId,
-                        githubRepositoryId: undefined,
-                        githubRepositoryFullName: undefined,
-                        githubDefaultBranch: undefined,
-                        repoUrl: '',
-                        branch: 'main',
-                      }));
-                      setRepositories([]);
-                      setBranches([]);
-                    }}
+              <div className="field" style={{ marginBottom: 14 }}>
+                <label className="label">Repository Source</label>
+                <div className="runtime-toggle" role="tablist" aria-label="Repository source">
+                  <button
+                    type="button"
+                    className={`runtime-option ${repositoryMode === 'github' ? 'runtime-option--active' : ''}`}
+                    onClick={() => setRepositoryMode('github')}
                     disabled={loading}
                   >
-                    <option value="">
-                      {loadingGithub
-                        ? 'Loading repository access...'
-                        : needsRepositoryAccess
-                          ? 'Grant repository access first'
-                          : 'Select installation'}
-                    </option>
-                    {installations.map((installation) => (
-                      <option key={installation.id} value={installation.id}>
-                        {installation.accountLogin}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="field-hint">
-                    {!githubConnected ? (
-                      <>
-                        Connect GitHub from the Integrations tab first, then install the GitHub App.
-                        {' '}
-                        {installUrl ? (
-                          <a href={installUrl} target="_blank" rel="noreferrer">
-                            Open install page
-                          </a>
-                        ) : null}
-                      </>
-                    ) : needsRepositoryAccess && installUrl ? (
-                      <>
-                        Your account is connected. Grant the Kereo GitHub App access to the repos
-                        you want to deploy.
-                        {' '}
-                        <a href={installUrl} target="_blank" rel="noreferrer">
-                          Grant repository access
-                        </a>
-                      </>
-                    ) : installUrl ? (
-                      <>
-                        Need another repo here? Update the GitHub App installation in your account or org.
-                        {' '}
-                        <a href={installUrl} target="_blank" rel="noreferrer">
-                          Manage repository access
-                        </a>
-                      </>
-                    ) : (
-                      'Configure the GitHub App to browse installed repositories.'
-                    )}
-                  </span>
-                </div>
-
-                <div className="field">
-                  <label className="label" htmlFor="proj-repo">
-                    <Globe size={11} style={{ marginRight: 4 }} />
-                    Repository
-                  </label>
-                  <select
-                    id="proj-repo"
-                    value={form.githubRepositoryId ?? ''}
-                    onChange={e => {
-                      const repository =
-                        repositories.find((item) => item.id === e.target.value) ?? null;
-                      setForm((current) => ({
-                        ...current,
-                        githubRepositoryId: repository?.id,
-                        githubRepositoryFullName: repository?.fullName,
-                        githubDefaultBranch: repository?.defaultBranch,
-                        repoUrl: repository?.repoUrl ?? '',
-                        branch: repository?.defaultBranch ?? current.branch,
-                      }));
-                      setBranches([]);
-                    }}
-                    required
-                    disabled={loading || !form.githubInstallationId}
+                    <Globe size={13} strokeWidth={2} />
+                    <span>GitHub</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`runtime-option ${repositoryMode === 'manual' ? 'runtime-option--active' : ''}`}
+                    onClick={() => setRepositoryMode('manual')}
+                    disabled={loading}
                   >
-                    <option value="">Select repository</option>
-                    {repositories.map((repository) => (
-                      <option key={repository.id} value={repository.id}>
-                        {repository.fullName}
-                        {repository.private ? ' (private)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                    <Terminal size={13} strokeWidth={2} />
+                    <span>Manual URL</span>
+                  </button>
                 </div>
+              </div>
+              <div className="form-grid">
+                {usingGithubRepository ? (
+                  <>
+                    <div className="field">
+                      <label className="label" htmlFor="proj-installation">
+                        <Globe size={11} style={{ marginRight: 4 }} />
+                        GitHub Installation
+                      </label>
+                      <select
+                        id="proj-installation"
+                        value={form.githubInstallationId ?? ''}
+                        onChange={e => {
+                          const installationId = e.target.value || undefined;
+                          setForm((current) => ({
+                            ...current,
+                            githubInstallationId: installationId,
+                            githubRepositoryId: undefined,
+                            githubRepositoryFullName: undefined,
+                            githubDefaultBranch: undefined,
+                            repoUrl: '',
+                            branch: 'main',
+                          }));
+                          setRepositories([]);
+                          setBranches([]);
+                        }}
+                        disabled={loading}
+                      >
+                        <option value="">
+                          {loadingGithub
+                            ? 'Loading repository access...'
+                            : needsRepositoryAccess
+                              ? 'Grant repository access first'
+                              : 'Select installation'}
+                        </option>
+                        {installations.map((installation) => (
+                          <option key={installation.id} value={installation.id}>
+                            {installation.accountLogin}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="field-hint">
+                        {!githubConnected ? (
+                          <>
+                            Connect GitHub from the Integrations tab first, then install the GitHub App.
+                            {' '}
+                            {installUrl ? (
+                              <a href={installUrl} target="_blank" rel="noreferrer">
+                                Open install page
+                              </a>
+                            ) : null}
+                          </>
+                        ) : needsRepositoryAccess && installUrl ? (
+                          <>
+                            Your account is connected. Grant the Kereo GitHub App access to the repos
+                            you want to deploy.
+                            {' '}
+                            <a href={installUrl} target="_blank" rel="noreferrer">
+                              Grant repository access
+                            </a>
+                          </>
+                        ) : installUrl ? (
+                          <>
+                            Need another repo here? Update the GitHub App installation in your account or org.
+                            {' '}
+                            <a href={installUrl} target="_blank" rel="noreferrer">
+                              Manage repository access
+                            </a>
+                          </>
+                        ) : (
+                          'Configure the GitHub App to browse installed repositories.'
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="field">
+                      <label className="label" htmlFor="proj-repo">
+                        <Globe size={11} style={{ marginRight: 4 }} />
+                        Repository
+                      </label>
+                      <select
+                        id="proj-repo"
+                        value={form.githubRepositoryId ?? ''}
+                        onChange={e => {
+                          const repository =
+                            repositories.find((item) => item.id === e.target.value) ?? null;
+                          setForm((current) => ({
+                            ...current,
+                            githubRepositoryId: repository?.id,
+                            githubRepositoryFullName: repository?.fullName,
+                            githubDefaultBranch: repository?.defaultBranch,
+                            repoUrl: repository?.repoUrl ?? '',
+                            branch: repository?.defaultBranch ?? current.branch,
+                          }));
+                          setBranches([]);
+                        }}
+                        required={usingGithubRepository}
+                        disabled={loading || !form.githubInstallationId}
+                      >
+                        <option value="">Select repository</option>
+                        {repositories.map((repository) => (
+                          <option key={repository.id} value={repository.id}>
+                            {repository.fullName}
+                            {repository.private ? ' (private)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                ) : (
+                  <div className="field form-grid-span-2">
+                    <label className="label" htmlFor="proj-repo-url">
+                      <Globe size={11} style={{ marginRight: 4 }} />
+                      Repository URL
+                    </label>
+                    <input
+                      id="proj-repo-url"
+                      value={form.repoUrl ?? ''}
+                      onChange={(e) => set('repoUrl', e.target.value)}
+                      placeholder="https://github.com/owner/repo.git"
+                      required
+                      disabled={loading}
+                    />
+                    <span className="field-hint">
+                      Use any Git URL your build environment can clone. GitHub sign-in is optional here.
+                    </span>
+                  </div>
+                )}
 
                 <div className="field">
                   <label className="label" htmlFor="proj-branch">
