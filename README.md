@@ -1,136 +1,185 @@
 # Kereo
 
-Deployment platform monorepo.
+Kereo is a deployment platform for shipping containerized applications to AWS ECS.
 
-## Services
+It gives users a single place to connect a repository, configure Docker build settings, manage environment variables, choose a database mode, trigger deployments, and inspect logs/status without jumping between AWS consoles.
 
-- `kereo-backend`: NestJS API and deployment control plane
-- `kereo-frontend`: Vite dashboard served as a static container on ECS
+## Deployment Flow
+
+```text
+GitHub repo -> AWS CodeBuild -> Amazon ECR -> ECS/Fargate -> ALB -> live service
+```
+
+Kereo's own infrastructure is managed through Terraform:
+
+```text
+GitHub Actions -> Terraform -> AWS infrastructure updates
+```
+
+Terraform state is stored remotely in S3 so infrastructure changes can run safely from CI.
+
+## Architecture
+
+![Kereo AWS architecture](kereo-frontend/public/Kereo-aws-diagram.png)
+
+Kereo provisions and orchestrates the platform pieces around each deployed app:
+
+- AWS ECS/Fargate services and task definitions
+- Application Load Balancer routing and health checks
+- Amazon ECR image publishing
+- AWS CodeBuild image builds
+- CloudWatch build and runtime logs
+- SSM Parameter Store backed secrets
+- Managed or external PostgreSQL configuration
+- Redis-backed background deployment processing
+
+## Screenshots
+
+### Projects Dashboard
+
+![Kereo dashboard](kereo-frontend/public/dashboard.png)
+
+### Create Project
+
+![Create project modal](kereo-frontend/public/create-project.png)
+
+### Project Details
+
+![Project details](kereo-frontend/public/project-details.png)
+
+### Deployment Logs
+
+![Deployment logs](kereo-frontend/public/logs.png)
+
+### Documentation
+
+![Kereo docs](kereo-frontend/public/docs.png)
+
+### GitHub Integration
+
+![Kereo integrations](kereo-frontend/public/integrations.png)
+
+## Core Features
+
+- **Repository-based deployments**: connect GitHub or use a manual repository URL.
+- **Docker build configuration**: set Dockerfile path, build context, app port, health check path, and runtime type.
+- **Build-time and runtime environment variables**: support frontend build args like `VITE_API_URL` and backend runtime secrets like `DATABASE_URL`.
+- **Database modes**: choose no database, Kereo-managed PostgreSQL, or an external database URL.
+- **Deployment tracking**: follow queued, build, push, and ECS rollout states from the project view.
+- **Actionable failure messages**: common AWS and Docker failures are translated into clearer next steps.
+- **GitHub integration**: connect repositories and trigger deployment workflows from the Kereo dashboard.
+- **Infrastructure CI/CD**: Terraform runs through GitHub Actions using remote S3 state.
+
+## Tech Stack
+
+**Application**
+
+- NestJS
+- React
+- TypeScript
+- PostgreSQL
+- Redis
+
+**AWS and Infrastructure**
+
+- AWS ECS/Fargate
+- Amazon ECR
+- AWS CodeBuild
+- Application Load Balancer
+- CloudWatch
+- SSM Parameter Store
+- Amazon RDS PostgreSQL
+- Amazon ElastiCache Redis
+- Terraform
+- GitHub Actions
+
+```
 
 ## Project Runtime Types
 
-Kereo supports two Dockerized project runtime presets:
+Kereo supports two Dockerized project presets.
 
-- `web-server`
-  - for containers that run their own web server process
-  - default port: `3000`
-  - default health check path: `/`
-- `static-site`
-  - for containers that serve built files through nginx or another static web server
-  - default port: `80`
-  - default health check path: `/`
+**Web server**
 
-Projects are published on dedicated subdomains:
+- For containers that run their own HTTP server.
+- Default port: `3000`
+- Common examples: NestJS, Express, FastAPI, Django, Rails
 
-```text
-<slug>.kereo.online
+**Static site**
+
+- For static frontend apps served through Nginx or another web server.
+- Default port: `80`
+- Common examples: React, Vite, Vue, static SPAs
+
+Projects are published on dedicated subdomains
+
 ```
 
-That means static React and Vite apps can usually keep their normal root-relative asset setup instead of being rewritten for a subpath like `/apps/<slug>`.
+## Environment Variables
+
+Kereo separates runtime env vars from build-time env vars.
+
+Runtime variables are injected into the ECS task definition. These are used by backend apps at container startup:
+
+```env
+DATABASE_URL=postgresql://...
+JWT_SECRET=...
+```
+
+Build-time variables are forwarded into Docker builds when marked as exposed to build. This matters for static frontends because Vite reads `VITE_*` variables while the bundle is being built:
+
+```dockerfile
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+```
+
+## Infrastructure CI/CD
+
+The infrastructure workflow lives in `.github/workflows/infra.yml`.
+
+It runs:
+
+```text
+terraform fmt -> terraform init -> terraform validate -> terraform plan -> terraform apply
+```
+
+Required GitHub repository variables include:
+
+```text
+TF_PROJECT_NAME
+TF_FRONTEND_CONTAINER_IMAGE
+TF_STATE_BUCKET
+TF_STATE_KEY
+TF_STATE_REGION
+TF_CERTIFICATE_ARN
+TF_HOSTED_ZONE_ID
+```
+
+Required GitHub secrets include:
+
+```text
+AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY
+TF_DB_PASSWORD
+TF_JWT_SECRET
+TF_GITHUB_WEBHOOK_SECRET
+```
 
 ## Production URLs
 
-- Frontend: `https://kereo.online/`
+- Frontend: `https://kereo.online`
 - Backend API: `https://kereo.online/api`
 - GitHub webhook endpoint: `https://kereo.online/api/webhooks/github`
 
-## Frontend Deployment
+## What I Learned
 
-The frontend is built as a static Vite app and packaged into an Nginx container. ECS serves that container behind the shared ALB, while `/api` routes stay pinned to the backend service.
+Kereo started as a deployment dashboard, but most of the meaningful engineering ended up being in the platform details:
 
-### Build and push the frontend image
+- keeping Terraform state usable from CI
+- handling build-time vs runtime configuration
+- wiring CodeBuild, ECR, ECS, ALB, SSM, CloudWatch, RDS, and Redis together
+- debugging managed database SSL behavior
+- making failed deployments explain what the user can do next
 
-```bash
-cd kereo-frontend
-
-export AWS_REGION=eu-central-1
-export AWS_ACCOUNT_ID=774281170440
-export ECR_REPO=kereo-v2-apps
-export IMAGE_TAG=frontend-$(date +%Y%m%d%H%M%S)
-export IMAGE_URI="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG"
-
-aws ecr get-login-password --region "$AWS_REGION" \
-  | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
-
-docker build \
-  --build-arg VITE_API_URL=https://kereo.online/api \
-  -t "$IMAGE_URI" .
-
-docker push "$IMAGE_URI"
-```
-
-### Roll out through Terraform
-
-Set `frontend_container_image` in [`kereo-backend/infra/terraform/terraform.tfvars`](/home/mortada0t/Projects/kereo/kereo-backend/infra/terraform/terraform.tfvars), then apply:
-
-```bash
-cd kereo-backend/infra/terraform
-terraform apply
-```
-
-After apply:
-
-- `https://kereo.online/` should serve the frontend
-- `https://kereo.online/api/health` should still serve the backend API
-
-## GitHub Webhook Setup
-
-Kereo can redeploy a project automatically when GitHub sends a `push` event for the repo and branch linked to that project.
-
-### What the user needs before setup
-
-- A project already created in Kereo
-- The project `repoUrl` must match the GitHub repository exactly
-- The project `branch` must match the branch you want GitHub to deploy from
-- The GitHub webhook secret must match the value configured in Kereo backend
-
-### GitHub setup steps
-
-In the GitHub repository, open:
-
-```text
-Settings -> Webhooks -> Add webhook
-```
-
-Use these values:
-
-```text
-Payload URL: https://kereo.online/api/webhooks/github
-Content type: application/json
-Secret: same value as GITHUB_WEBHOOK_SECRET
-Events: Just the push event
-Active: checked
-```
-
-### How matching works
-
-Kereo will trigger a deployment only when both match:
-
-```text
-repository.full_name == project.repoUrl owner/repo
-ref branch == project.branch
-```
-
-Example:
-
-```text
-GitHub repository: Mortada-Houmani/aws-terraform-fullstack-todo-app
-Project repoUrl:   https://github.com/Mortada-Houmani/aws-terraform-fullstack-todo-app
-Project branch:    main
-```
-
-### Expected result
-
-After a push to the configured branch:
-
-- GitHub sends a `push` webhook to Kereo
-- Kereo verifies the signature using `GITHUB_WEBHOOK_SECRET`
-- Kereo finds the matching project by repo + branch
-- A new deployment is created automatically
-
-### Troubleshooting
-
-- `404 Not Found`: make sure the payload URL includes `/api/webhooks/github`
-- `401 Unauthorized`: webhook secret does not match `GITHUB_WEBHOOK_SECRET`
-- No deployment created: check that the GitHub repo and branch exactly match the Kereo project
-- Webhook delivered but nothing changed: verify the project exists in Kereo and targets the pushed branch
+The result is a full deployment workflow that behaves much closer to a small platform than a single application.
